@@ -427,10 +427,11 @@
     </nav>
 
     <div class="nav-actions">
-      <!-- DYNAMIC ROOM CODE (Connect phone here) -->
+      <!-- DYNAMIC ROOM CODE (Persistent across reloads) -->
       <div class="room-badge" id="roomBadge">CODE: ----</div>
-      <!-- SEARCH BAR -->
+      <!-- SEARCH BAR & MIC BUTTON -->
       <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search Movies..." oninput="handleSearchInput(this.value)">
+      <button id="mic-btn" onclick="triggerVoiceSearch()" style="background: none; border: none; font-size: 20px; cursor: pointer; margin-left: 10px; vertical-align: middle;" title="Voice Search">🎤</button>
       <button onclick="window.location.reload()" class="action-btn">↻ [9]</button>
     </div>
   </header>
@@ -450,7 +451,7 @@
   <div class="catalog-wrap">
     <div class="section-bar">
       <h2 class="section-title" id="sectionTitle">🔥 Trending Today</h2>
-      <span class="remote-hint">[4/6] Left/Right · [8] Down · [2] Up · [5/OK] Play</span>
+      <span class="remote-hint">[4/6] Left/Right · [8] Down · [2] Up · [5/OK] Play · [0] Voice Search</span>
     </div>
     <div class="grid" id="homeGrid">
       <div class="loading-pulse">Loading Cinema Catalog...</div>
@@ -485,8 +486,12 @@
     var totalPages = 1;
     var isLoadingMore = false;
 
-    // --- RANDOM 4-DIGIT ROOM CODE GENERATION ---
-    var roomCode = Math.floor(1000 + Math.random() * 9000).toString();
+    // --- PERSISTENT 4-DIGIT ROOM CODE GENERATION ---
+    var roomCode = localStorage.getItem('pocketFlixRoomCode');
+    if (!roomCode) {
+      roomCode = Math.floor(1000 + Math.random() * 9000).toString();
+      localStorage.setItem('pocketFlixRoomCode', roomCode);
+    }
     document.getElementById('roomBadge').innerText = 'CODE: ' + roomCode;
 
     // --- SYNTHETIC WEB AUDIO CHIMES ---
@@ -578,6 +583,57 @@
         }
       };
       xhr.send();
+    }
+
+    // --- VOICE SEARCH IMPLEMENTATION ---
+    function triggerVoiceSearch() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            showToast("Voice search is not supported on this TV browser.");
+            return;
+        }
+        
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.placeholder = "🎤 Listening...";
+        }
+        showAssistant("Listening...");
+        playBeep('start');
+        
+        recognition.onresult = (event) => {
+            const query = event.results[0][0].transcript;
+            console.log("Heard:", query);
+            
+            if (searchInput) {
+                searchInput.value = query;
+                searchInput.placeholder = "🔍 Search Movies...";
+            }
+            showAssistant('Searching: "' + query + '"');
+            assistantHideTimeout = setTimeout(hideAssistant, 3000);
+            
+            // Trigger the search query automatically
+            handleSearchInput(query); 
+        };
+        
+        recognition.onerror = (event) => {
+            console.error("Speech Error:", event.error);
+            if (searchInput) searchInput.placeholder = "🔍 Search Movies...";
+            showToast("Voice check failed: " + event.error);
+            hideAssistant();
+        };
+
+        recognition.onend = () => {
+             if (searchInput && searchInput.placeholder === "🎤 Listening...") {
+                 searchInput.placeholder = "🔍 Search Movies...";
+             }
+        };
+        
+        recognition.start();
     }
 
     // --- TMDB CATALOG NAVIGATION ---
@@ -842,6 +898,13 @@
       }
 
       if (document.activeElement === document.getElementById('searchInput')) {
+        return;
+      }
+
+      // VOICE SEARCH KEY BINDING ('0' button)
+      if (code === 48 || code === 96 || key === '0') {
+        e.preventDefault();
+        triggerVoiceSearch();
         return;
       }
 
