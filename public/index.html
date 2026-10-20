@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>PocketFlix | Cinema OS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <!-- Socket.io for Phone Remote Connection -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    /* ZERO-BLOAT SONY BRAVIA LINUX TV STYLESHEET (128MB RAM OPTIMIZED) */
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      outline: none !important;
+    }
+
+    ::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #050507;
+      color: #f0f2f5;
+      font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+      overflow-x: hidden;
+      height: 100%;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* TOP NAVIGATION BAR */
+    .nav-wrap {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 72px;
+      z-index: 100;
+      padding: 0 36px;
+      background: #050507;
+      background: linear-gradient(180deg, #050507 0%, rgba(5,5,7,0.92) 75%, transparent 100%);
+      line-height: 72px;
+    }
+
+    .brand {
+      float: left;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .menu-bar {
+      float: left;
+      margin-left: 30px;
+    }
+
+    .menu-item {
+      display: inline-block;
+      font-size: 13px;
+      font-weight: 800;
+      color: #7d8590;
+      padding: 0 10px;
+      margin-right: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .menu-item.active {
+      color: #ffffff;
+    }
+
+    .color-dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      margin-right: 7px;
+      vertical-align: middle;
+    }
+
+    .dot-red    { background-color: #E50914; }
+    .dot-green  { background-color: #2ecc71; }
+    .dot-yellow { background-color: #f1c40f; }
+    .dot-blue   { background-color: #3498db; }
+
+    .nav-actions {
+      float: right;
+      line-height: 72px;
+    }
+
+    .action-btn {
+      display: inline-block;
+      background-color: #16181d;
+      color: #d0d7de;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 800;
+      margin-left: 8px;
+      line-height: 1.2;
+      vertical-align: middle;
+    }
+
+    /* ROOM CODE BADGE */
+    .room-badge {
+      display: inline-block;
+      background-color: #E50914;
+      color: #ffffff;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      margin-left: 8px;
+      line-height: 1.2;
+      vertical-align: middle;
+      box-shadow: 0 2px 10px rgba(229, 9, 20, 0.4);
+    }
+
+    /* TOP SEARCH BAR */
+    .search-input {
+      display: inline-block;
+      width: 160px;
+      background-color: #121318;
+      border: 1px solid #30363d;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      vertical-align: middle;
+      margin-left: 8px;
+      transition: width 0.2s ease, border-color 0.2s ease;
+    }
+
+    .search-input:focus {
+      width: 220px;
+      border-color: #58a6ff;
+    }
+
+    /* DYNAMIC HERO SPOTLIGHT BANNER */
+    .hero-banner {
+      position: relative;
+      width: 100%;
+      height: 330px;
+      background-color: #0a0b0e;
+      background-position: center 20%;
+      background-size: cover;
+      background-repeat: no-repeat;
+      padding: 85px 36px 20px 36px;
+      overflow: hidden;
+    }
+
+    .hero-vignette {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      background: linear-gradient(90deg, #050507 0%, rgba(5,5,7,0.88) 42%, rgba(5,5,7,0.2) 100%),
+                  linear-gradient(180deg, transparent 50%, #050507 100%);
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 5;
+      max-width: 680px;
+      padding-top: 15px;
+    }
+
+    .hero-tag {
+      display: inline-block;
+      background-color: #E50914;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 900;
+      padding: 4px 8px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+
+    .hero-title {
+      font-size: 34px;
+      font-weight: 900;
+      color: #ffffff;
+      margin: 0 0 8px 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 2px 10px #000000;
+    }
+
+    .hero-meta {
+      font-size: 13px;
+      font-weight: 800;
+      color: #ffca28;
+      margin-bottom: 10px;
+    }
+
+    .hero-desc {
+      font-size: 13px;
+      font-weight: 500;
+      color: #b1bac4;
+      line-height: 1.45;
+      height: 56px;
+      overflow: hidden;
+      margin: 0;
+    }
+
+    /* 5-COLUMN POSTER GRID (FIXED ASPECT RATIO - NO STRETCHING) */
+    .catalog-wrap {
+      padding: 10px 26px 50px 26px;
+    }
+
+    .section-bar {
+      padding: 0 10px 14px 10px;
+      overflow: hidden;
+    }
+
+    .section-title {
+      float: left;
+      font-size: 18px;
+      font-weight: 800;
+      margin: 0;
+      color: #ffffff;
+    }
+
+    .remote-hint {
+      float: right;
+      font-size: 11px;
+      font-weight: 700;
+      color: #6e7681;
+      line-height: 22px;
+    }
+
+    .grid {
+      width: 100%;
+      font-size: 0;
+      text-align: left;
+    }
+
+    .card {
+      display: inline-block;
+      vertical-align: top;
+      width: 18%;
+      margin: 0 1% 24px 1%;
+      font-size: 13px;
+      cursor: pointer;
+      opacity: 0.65;
+      -webkit-transform: translate3d(0, 0, 0);
+      transform: translate3d(0, 0, 0);
+      -webkit-transition: -webkit-transform 0.18s ease-out, opacity 0.18s ease-out;
+      transition: transform 0.18s ease-out, opacity 0.18s ease-out;
+    }
+
+    .poster {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 2 / 3; /* STRICTLY PREVENTS STRETCHING */
+      border-radius: 8px;
+      overflow: hidden;
+      background-color: #111318;
+      border: none !important;
+    }
+
+    .poster img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* PERFECT CROPPING */
+      display: block;
+    }
+
+    .card.active-card, .card:hover {
+      opacity: 1;
+      -webkit-transform: translate3d(0, -10px, 0) scale(1.05);
+      transform: translate3d(0, -10px, 0) scale(1.05);
+      z-index: 10;
+    }
+
+    .card.active-card .poster, .card:hover .poster {
+      box-shadow: 0 14px 28px #000000, 0 0 18px rgba(229, 9, 20, 0.45);
+      border: none !important;
+    }
+
+    .card-title {
+      margin-top: 9px;
+      font-size: 13px;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #ffffff;
+    }
+
+    .card-sub {
+      font-size: 11px;
+      color: #7d8590;
+      font-weight: 700;
+      margin-top: 3px;
+    }
+
+    .star-rating {
+      color: #ffca28;
+    }
+
+    .loading-pulse {
+      width: 98%;
+      margin: 0 auto;
+      height: 90px;
+      border-radius: 8px;
+      background-color: #0d0f14;
+      text-align: center;
+      line-height: 90px;
+      color: #7d8590;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    /* PLAYER MODAL OVERLAY */
+    #playerModal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #000;
+      z-index: 99999;
+    }
+    #tvPlayer {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* STATUS TOAST */
+    #statusToast {
+      display: none;
+      position: fixed;
+      bottom: 26px;
+      right: 26px;
+      background: #E50914;
+      color: #fff;
+      padding: 12px 22px;
+      border-radius: 6px;
+      font-weight: 800;
+      font-size: 13px;
+      z-index: 99999;
+    }
+
+    /* GEMINI-STYLE ASSISTANT NOTIFICATION BAR */
+    .assistant-bar {
+      position: fixed;
+      bottom: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      max-width: 600px;
+      background: rgba(18, 19, 24, 0.96);
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 20px rgba(88, 166, 255, 0.25);
+      transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 100000;
+    }
+    .assistant-bar.active {
+      bottom: 40px;
+    }
+    .assistant-icon {
+      font-size: 24px;
+      margin-right: 16px;
+      animation: glowPulse 1.5s infinite;
+      text-shadow: 0 0 10px rgba(88, 166, 255, 0.8);
+    }
+    .assistant-text {
+      font-size: 15px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 0.5px;
+    }
+    @keyframes glowPulse {
+      0%, 100% { opacity: 0.6; transform: scale(0.95); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="nav-wrap">
+    <a class="brand" href="#" onclick="switchCategory('home'); return false;">
+      POCKET<span style="color: #E50914;">FLIX</span>
+    </a>
+
+    <nav class="menu-bar">
+      <button class="menu-item active" id="nav-home" onclick="switchCategory('home')">
+        <span class="color-dot dot-red"></span>Home
+      </button>
+      <button class="menu-item" id="nav-movies" onclick="switchCategory('movies')">
+        <span class="color-dot dot-green"></span>Movies
+      </button>
+      <button class="menu-item" id="nav-series" onclick="switchCategory('series')">
+        <span class="color-dot dot-yellow"></span>Series
+      </button>
+      <button class="menu-item" id="nav-bollywood" onclick="switchCategory('bollywood')">
+        <span class="color-dot dot-blue"></span>Bollywood
+      </button>
+    </nav>
+
+    <div class="nav-actions">
+      <!-- DYNAMIC ROOM CODE (Connect phone here) -->
+      <div class="room-badge" id="roomBadge">CODE: ----</div>
+      <!-- SEARCH BAR -->
+      <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search Movies..." oninput="handleSearchInput(this.value)">
+      <button onclick="window.location.reload()" class="action-btn">↻ [9]</button>
+    </div>
+  </header>
+
+  <!-- DYNAMIC SPOTLIGHT HERO BANNER -->
+  <section class="hero-banner" id="heroBanner">
+    <div class="hero-vignette"></div>
+    <div class="hero-content">
+      <span class="hero-tag" id="heroTag">SPOTLIGHT</span>
+      <h1 class="hero-title" id="heroTitle">Loading PocketFlix...</h1>
+      <div class="hero-meta" id="heroMeta">★ -- · ----</div>
+      <p class="hero-desc" id="heroDesc">Use [4 / 8 / 6 / 2] on your Sony remote to browse and press [5 / OK] to play.</p>
+    </div>
+  </section>
+
+  <!-- 5-COLUMN POSTER CATALOG -->
+  <div class="catalog-wrap">
+    <div class="section-bar">
+      <h2 class="section-title" id="sectionTitle">🔥 Trending Today</h2>
+      <span class="remote-hint">[4/6] Left/Right · [8] Down · [2] Up · [5/OK] Play</span>
+    </div>
+    <div class="grid" id="homeGrid">
+      <div class="loading-pulse">Loading Cinema Catalog...</div>
+    </div>
+  </div>
+
+  <!-- VIDEO PLAYER MODAL -->
+  <div id="playerModal">
+    <video id="tvPlayer" controls autoplay></video>
+  </div>
+
+  <!-- STATUS TOAST -->
+  <div id="statusToast"></div>
+
+  <!-- GEMINI POP-UP ASSISTANT BAR -->
+  <div id="assistantBar" class="assistant-bar">
+    <div class="assistant-icon">✨</div>
+    <div class="assistant-text" id="assistantText">Ready</div>
+  </div>
+
+  <script>
+    // --- SERVER CONFIGURATION ---
+    // If testing locally, keep this as localhost:3000.
+    // When deploying to Render, paste your Render URL here: 'https://YOUR_APP.onrender.com'
+    var BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:3000'
+      : 'https://pocket-cinema-server.onrender.com';
+
+    var TMDB_API_KEY = '3fd2be6f0c70a2a598f084ddfb75487c';
+    var currentItems = [];
+    var currentIndex = 0;
+    var hlsInstance = null;
+
+    var currentCategory = 'home';
+    var searchQuery = '';
+    var currentPage = 1;
+    var totalPages = 1;
+    var isLoadingMore = false;
+
+    // --- RANDOM 4-DIGIT ROOM CODE GENERATION ---
+    var roomCode = Math.floor(1000 + Math.random() * 9000).toString();
+    document.getElementById('roomBadge').innerText = 'CODE: ' + roomCode;
+
+    // --- SYNTHETIC WEB AUDIO CHIMES ---
+    var audioCtx = null;
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function playBeep(type) {
+      initAudio();
+      var osc = audioCtx.createOscillator();
+      var gainNode = audioCtx.createGain();
+      osc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      if (type === 'start') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.2);
+      } else {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.3);
+      }
+    }
+
+    // --- ASSISTANT BAR UI CONTROLS ---
+    var assistantHideTimeout = null;
+    function showAssistant(text) {
+      clearTimeout(assistantHideTimeout);
+      document.getElementById('assistantText').innerText = text;
+      document.getElementById('assistantBar').classList.add('active');
+    }
+    function hideAssistant() {
+      document.getElementById('assistantBar').classList.remove('active');
+    }
+
+    // --- WEBSOCKET LISTENER FOR PHONE COMMANDS ---
+    try {
+      var socket = io(BACKEND_URL);
+
+      socket.on('connect', function() {
+        socket.emit('join_room', roomCode);
+      });
+
+      socket.on('assistant_update', function(data) {
+        if (data.status === 'processing') playBeep('start');
+        showAssistant(data.message);
+        if (data.status === 'error' || data.status === 'success') {
+          assistantHideTimeout = setTimeout(hideAssistant, 4000);
+        }
+      });
+
+      socket.on('execute_action', function(data) {
+        playBeep('success');
+        if (data.action === 'weather') {
+          fetchWeather();
+        } else if (data.action === 'search') {
+          showAssistant('Searching: ' + data.query);
+          handleSearchInput(data.query);
+          assistantHideTimeout = setTimeout(hideAssistant, 3000);
+        } else if (data.action === 'play') {
+          hideAssistant();
+          var finalStreamUrl = data.streamUrl.startsWith('http') ? data.streamUrl : (BACKEND_URL + data.streamUrl);
+          startVideo(finalStreamUrl);
+        }
+      });
+    } catch (e) {
+      console.log('Socket connection offline, running standalone.');
+    }
+
+    // --- WEATHER API LOOKUP (Nashik) ---
+    function fetchWeather() {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'https://api.open-meteo.com/v1/forecast?latitude=19.9975&longitude=73.7898&current=temperature_2m', true);
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          var temp = JSON.parse(xhr.responseText).current.temperature_2m;
+          showAssistant("It's currently " + temp + "°C in Nashik.");
+          assistantHideTimeout = setTimeout(hideAssistant, 5000);
+        }
+      };
+      xhr.send();
+    }
+
+    // --- TMDB CATALOG NAVIGATION ---
+    function switchCategory(type) {
+      currentCategory = type;
+      searchQuery = '';
+      document.getElementById('searchInput').value = '';
+
+      document.getElementById('nav-home').className = 'menu-item' + (type === 'home' ? ' active' : '');
+      document.getElementById('nav-movies').className = 'menu-item' + (type === 'movies' ? ' active' : '');
+      document.getElementById('nav-series').className = 'menu-item' + (type === 'series' ? ' active' : '');
+      document.getElementById('nav-bollywood').className = 'menu-item' + (type === 'bollywood' ? ' active' : '');
+
+      currentPage = 1;
+      fetchCatalog(false);
+    }
+
+    function handleSearchInput(val) {
+      searchQuery = val.trim();
+      currentPage = 1;
+      fetchCatalog(false);
+    }
+
+    function getApiUrl() {
+      if (searchQuery.length > 0) {
+        document.getElementById('sectionTitle').innerText = '🔍 Search: "' + searchQuery + '"';
+        return 'https://api.themoviedb.org/3/search/multi?api_key=' + TMDB_API_KEY + '&query=' + encodeURIComponent(searchQuery) + '&page=' + currentPage;
+      }
+
+      var titleEl = document.getElementById('sectionTitle');
+      if (currentCategory === 'home') {
+        titleEl.innerText = '🔥 Trending Today';
+        return 'https://api.themoviedb.org/3/trending/all/day?api_key=' + TMDB_API_KEY + '&page=' + currentPage;
+      } else if (currentCategory === 'movies') {
+        titleEl.innerText = '🎬 Popular Movies';
+        return 'https://api.themoviedb.org/3/movie/popular?api_key=' + TMDB_API_KEY + '&language=en-US&page=' + currentPage;
+      } else if (currentCategory === 'series') {
+        titleEl.innerText = '📺 Popular TV Series';
+        return 'https://api.themoviedb.org/3/tv/popular?api_key=' + TMDB_API_KEY + '&language=en-US&page=' + currentPage;
+      } else if (currentCategory === 'bollywood') {
+        titleEl.innerText = '🇮🇳 Popular Bollywood';
+        return 'https://api.themoviedb.org/3/discover/movie?api_key=' + TMDB_API_KEY + '&with_original_language=hi&sort_by=popularity.desc&page=' + currentPage;
+      }
+    }
+
+    function fetchCatalog(append) {
+      if (isLoadingMore) return;
+      isLoadingMore = true;
+
+      var grid = document.getElementById('homeGrid');
+      if (!append) {
+        grid.innerHTML = '<div class="loading-pulse">Loading Cinema Catalog...</div>';
+        currentItems = [];
+        currentIndex = 0;
+      }
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', getApiUrl(), true);
+      xhr.onload = function() {
+        isLoadingMore = false;
+        if (xhr.status === 200) {
+          var resp = JSON.parse(xhr.responseText);
+          var results = resp.results || [];
+          totalPages = resp.total_pages || 1;
+          renderGrid(results, append);
+        }
+      };
+      xhr.onerror = function() {
+        isLoadingMore = false;
+      };
+      xhr.send();
+    }
+
+    function renderGrid(items, append) {
+      var grid = document.getElementById('homeGrid');
+      if (!append) grid.innerHTML = '';
+
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        if (!item.poster_path) continue;
+        if (item.media_type === 'person') continue;
+
+        currentItems.push(item);
+        var cardIndex = currentItems.length - 1;
+
+        var title = item.title || item.name || 'Untitled';
+        var dateStr = (item.release_date || item.first_air_date || 'N/A').split('-')[0];
+        var rating = item.vote_average ? item.vote_average.toFixed(1) : 'NR';
+
+        var card = document.createElement('article');
+        card.className = 'card' + ((!append && cardIndex === 0) ? ' active-card' : '');
+        card.id = 'card-' + cardIndex;
+        card.innerHTML = '<div class="poster"><img src="https://image.tmdb.org/t/p/w342' + item.poster_path + '"></div>' +
+                         '<div class="card-title">' + title + '</div>' +
+                         '<div class="card-sub">' + dateStr + ' · <span class="star-rating">★</span> ' + rating + '</div>';
+
+        card.onclick = (function(idx) {
+          return function() {
+            highlightCard(idx);
+            selectCurrentCard();
+          };
+        })(cardIndex);
+
+        grid.appendChild(card);
+      }
+
+      if (!append && currentItems.length > 0) {
+        updateHeroSpotlight(currentItems[0]);
+      }
+    }
+
+    // INFINITE SCROLL
+    window.addEventListener('scroll', function() {
+      var scrollPos = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      var viewHeight = window.innerHeight || document.documentElement.clientHeight || 720;
+      var docHeight = document.body.offsetHeight || document.documentElement.scrollHeight || 0;
+      
+      if ((viewHeight + scrollPos) >= docHeight - 500) {
+        if (!isLoadingMore && currentPage < totalPages) {
+          currentPage++;
+          fetchCatalog(true);
+        }
+      }
+    });
+
+    function updateHeroSpotlight(item) {
+      if (!item) return;
+      var title = item.title || item.name || 'Untitled';
+      var dateStr = (item.release_date || item.first_air_date || 'N/A').split('-')[0];
+      var rating = item.vote_average ? item.vote_average.toFixed(1) : 'NR';
+      var isSeries = (item.first_air_date && !item.release_date);
+
+      document.getElementById('heroTag').innerText = isSeries ? 'TV SERIES' : 'FEATURE FILM';
+      document.getElementById('heroTitle').innerText = title;
+      document.getElementById('heroMeta').innerText = '★ ' + rating + ' TMDB  ·  ' + dateStr +  '  ·  Press [5/OK] to Play';
+      document.getElementById('heroDesc').innerText = item.overview || 'No description available.';
+
+      var bgPath = item.backdrop_path || item.poster_path;
+      if (bgPath) {
+        document.getElementById('heroBanner').style.backgroundImage = 'url(https://image.tmdb.org/t/p/w780' + bgPath + ')';
+      }
+    }
+
+    function highlightCard(newIndex) {
+      if (currentItems.length === 0) return;
+      if (newIndex < 0) newIndex = 0;
+      if (newIndex >= currentItems.length) newIndex = currentItems.length - 1;
+
+      var oldCard = document.getElementById('card-' + currentIndex);
+      if (oldCard) oldCard.className = 'card';
+
+      currentIndex = newIndex;
+      var newCard = document.getElementById('card-' + currentIndex);
+      if (newCard) {
+        newCard.className = 'card active-card';
+        updateHeroSpotlight(currentItems[currentIndex]);
+
+        var absoluteTop = 0;
+        var el = newCard;
+        while (el) {
+          absoluteTop += el.offsetTop;
+          el = el.offsetParent;
+        }
+
+        var scrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+        var viewHeight = window.innerHeight || document.documentElement.clientHeight || 720;
+        
+        if (absoluteTop < 450) {
+          window.scrollTo(0, 0);
+        } else if (absoluteTop > scrollY + viewHeight - 200 || absoluteTop < scrollY + 80) {
+          window.scrollTo(0, absoluteTop - (viewHeight / 2) + 150);
+        }
+      }
+    }
+
+    function showToast(msg) {
+      var t = document.getElementById("statusToast");
+      if (t) {
+        t.innerText = msg;
+        t.style.display = "block";
+        setTimeout(function() { t.style.display = "none"; }, 4000);
+      }
+    }
+
+    function selectCurrentCard() {
+      var item = currentItems[currentIndex];
+      if (!item) return;
+      var title = item.title || item.name || 'Movie';
+      playMovie(item.id, title);
+    }
+
+    // RESOLVE & STREAM (Routes to your cloud Node.js backend)
+    function playMovie(tmdbId, title) {
+      showToast('⚡ Sniffing stream for "' + title + '"...');
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', BACKEND_URL + '/resolve?tmdb=' + tmdbId, true);
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          try {
+            var data = JSON.parse(xhr.responseText);
+            if (data.status === 'ok' && data.streamUrl) {
+              showToast('▶ Playing "' + title + '"');
+              var finalUrl = data.streamUrl.startsWith('http') ? data.streamUrl : (BACKEND_URL + data.streamUrl);
+              startVideo(finalUrl);
+            } else {
+              showToast('❌ Could not resolve stream link.');
+            }
+          } catch(e) {
+            showToast('❌ Error parsing server response.');
+          }
+        } else {
+          showToast('❌ Server error.');
+        }
+      };
+      xhr.onerror = function() {
+        showToast('❌ Server connection failed.');
+      };
+      xhr.send();
+    }
+
+    function startVideo(url) {
+      var modal = document.getElementById("playerModal");
+      var video = document.getElementById("tvPlayer");
+      if (modal) modal.style.display = "block";
+
+      if (window.Hls && Hls.isSupported() && url.indexOf(".m3u8") !== -1) {
+        if (hlsInstance) hlsInstance.destroy();
+        hlsInstance = new Hls();
+        hlsInstance.loadSource(url);
+        hlsInstance.attachMedia(video);
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() { 
+          if (video) video.play(); 
+        });
+      } else {
+        if (video) {
+          video.src = url;
+          video.play();
+        }
+      }
+    }
+
+    // REMOTE CONTROLLER EVENT HANDLER
+    window.addEventListener('keydown', function(e) {
+      initAudio();
+      var modal = document.getElementById("playerModal");
+      var code = e.keyCode || e.which;
+      var key = e.key || '';
+
+      if (modal && modal.style.display === "block") {
+        if (code === 27 || code === 10009 || code === 8 || key === 'Escape') {
+          e.preventDefault();
+          var video = document.getElementById("tvPlayer");
+          if (video) {
+            video.pause();
+            video.src = "";
+          }
+          if (hlsInstance) hlsInstance.destroy();
+          modal.style.display = "none";
+        }
+        return;
+      }
+
+      if (document.activeElement === document.getElementById('searchInput')) {
+        return;
+      }
+
+      if (code === 403 || key === 'ColorF0Red' || key === 'Red' || code === 82) {
+        e.preventDefault();
+        switchCategory('home');
+        return;
+      }
+      if (code === 404 || key === 'ColorF1Green' || key === 'Green' || code === 71) {
+        e.preventDefault();
+        switchCategory('movies');
+        return;
+      }
+      if (code === 405 || key === 'ColorF2Yellow' || key === 'Yellow' || code === 89) {
+        e.preventDefault();
+        switchCategory('series');
+        return;
+      }
+      if (code === 406 || key === 'ColorF3Blue' || key === 'Blue' || code === 66) {
+        e.preventDefault();
+        switchCategory('bollywood');
+        return;
+      }
+
+      if (code === 57 || code === 105 || key === '9' || code === 116) {
+        e.preventDefault();
+        window.location.reload();
+        return;
+      }
+
+      var cols = 5;
+      if (code === 52 || code === 100 || key === '4') {
+        e.preventDefault();
+        highlightCard(currentIndex - 1);
+      } else if (code === 54 || code === 102 || key === '6') {
+        e.preventDefault();
+        highlightCard(currentIndex + 1);
+      } else if (code === 56 || code === 104 || key === '8') {
+        e.preventDefault();
+        highlightCard(currentIndex + cols);
+      } else if (code === 50 || code === 98 || key === '2') {
+        e.preventDefault();
+        highlightCard(currentIndex - cols);
+      } else if (code === 53 || code === 101 || key === '5' || code === 13) {
+        e.preventDefault();
+        selectCurrentCard();
+      }
+    });
+
+    fetchCatalog(false);
+  </script>
+</body>
+</html>
