@@ -49,12 +49,12 @@ app.get('/proxy-stream', async (req, res) => {
   }
 });
 
-async function sniffStream(tmdbId) {
+async function sniffStream(tmdbParam) {
   let browser;
-  console.log(`\n[Puppeteer] Starting extraction for TMDB: ${tmdbId}`);
+  console.log(`\n[Puppeteer] Starting extraction for target: ${tmdbParam}`);
   
   try {
-    console.log(`[Puppeteer] Launching browser...`);
+    console.log(`[Puppeteer] Launching browser with security/CSP bypass flags...`);
     browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -63,6 +63,7 @@ async function sniffStream(tmdbId) {
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--disable-web-security', 
+        '--allow-running-insecure-content',
         '--disable-features=IsolateOrigins,site-per-process' 
       ]
     });
@@ -116,7 +117,8 @@ async function sniffStream(tmdbId) {
       });
 
       try {
-        const targetUrl = `https://www.moviesnexus.fun/movie/${tmdbId}`;
+        // Supports both movie/:tmdbId and tv/:tmdbId/:season/:episode schemas
+        const targetUrl = `https://www.moviesnexus.fun/${tmdbParam.startsWith('tv/') ? tmdbParam : 'movie/' + tmdbParam}`;
         console.log(`[Puppeteer] Initiating goto: ${targetUrl}`);
         
         await page.goto(targetUrl, { timeout: 60000 }); 
@@ -128,7 +130,6 @@ async function sniffStream(tmdbId) {
       if (resolved) return;
 
       try {
-        // Safe title extraction that catches context destruction instead of crashing
         let title = 'Unknown';
         try {
           title = await page.title();
@@ -157,9 +158,7 @@ async function sniffStream(tmdbId) {
               return count;
             });
             clicks += clicked;
-          } catch (e) {
-             // Silently ignore context destruction on individual iframes
-          }
+          } catch (e) {}
         }
         console.log(`[Puppeteer] Performed ${clicks} interaction attempts. Waiting for stream network traffic...`);
 
@@ -181,12 +180,12 @@ async function sniffStream(tmdbId) {
 }
 
 app.get('/resolve', async (req, res) => {
-  const tmdbId = req.query.tmdb || '550';
+  const tmdbParam = req.query.tmdb || '550';
   console.log(`\n=========================================`);
-  console.log(`[*] Manual click resolve for TMDB: ${tmdbId}`);
+  console.log(`[*] Manual click resolve for Target: ${tmdbParam}`);
   
   try {
-    const result = await sniffStream(tmdbId);
+    const result = await sniffStream(tmdbParam);
     if (result && result.url) {
       console.log(`[*] Successfully resolving stream to frontend.`);
       res.json({ status: 'ok', streamUrl: `/proxy-stream?url=${encodeURIComponent(result.url)}` });
