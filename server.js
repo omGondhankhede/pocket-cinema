@@ -13,7 +13,12 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// --- Socket.io: Handle TV Connections ---
+// Root health check so you don't get "Cannot GET /"
+app.get('/', (req, res) => {
+  res.send('PocketFlix Cinema Backend is Live & Running!');
+});
+
+// Socket.io for Room Codes
 io.on('connection', (socket) => {
   console.log(`[+] TV Connected: ${socket.id}`);
   
@@ -27,49 +32,73 @@ io.on('connection', (socket) => {
   });
 });
 
-// --- HLS Proxy Route: Fixes Audio Sync ---
+// HLS Proxy Route: Cleans audio tracks to fix drift
 app.get('/proxy-stream', async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).send('Missing stream URL');
+
   try {
     const response = await fetch(targetUrl);
     let playlistText = await response.text();
+
     const lines = playlistText.split('\n');
-    const sanitizedLines = lines.filter(line => !line.includes('TYPE="AUDIO"') && !line.includes("TYPE='AUDIO'"));
+    const sanitizedLines = lines.filter(line => {
+      if (line.includes('TYPE="AUDIO"') || line.includes("TYPE='AUDIO'")) return false;
+      return true;
+    });
+
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.send(sanitizedLines.join('\n'));
-  } catch (err) { res.status(500).send('Failed to proxy stream'); }
+  } catch (err) {
+    res.status(500).send('Failed to proxy stream');
+  }
 });
 
-// --- Stream Sniffer (Cloud RAM Optimized) ---
+// Stream Sniffer (Headless Puppeteer with low RAM usage)
 async function sniffStream(tmdbId) {
   const { browser, page } = await connect({
     headless: false,
     turnstile: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process']
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--single-process'
+    ]
   });
+
   await page.setViewport({ width: 800, height: 600 });
   await page.setRequestInterception(true);
+  
   page.on('request', (req) => {
     const type = req.resourceType();
     const blockList = ['googlesyndication.com', 'google-analytics.com', 'doubleclick.net', 'popads.net'];
-    if (['image', 'stylesheet', 'font'].includes(type) || blockList.some(d => req.url().includes(d))) req.abort();
-    else req.continue();
+    if (['image', 'stylesheet', 'font'].includes(type) || blockList.some(domain => req.url().includes(domain))) {
+      req.abort();
+    } else {
+      req.continue();
+    }
   });
 
   return new Promise(async (resolve) => {
     let resolved = false;
+
     const timer = setTimeout(async () => {
-      if (!resolved) { await browser.close().catch(()=>{}); resolve(null); }
+      if (!resolved) {
+        await browser.close().catch(() => {});
+        resolve(null);
+      }
     }, 45000);
 
     page.on('response', async (response) => {
       const url = response.url();
       if ((url.includes('.m3u8') || url.includes('.mp4')) && !url.includes('google')) {
         if (!resolved) {
-          resolved = true; clearTimeout(timer);
-          setTimeout(async () => { await browser.close().catch(()=>{}); }, 1500);
+          resolved = true;
+          clearTimeout(timer);
+          setTimeout(async () => { await browser.close().catch(() => {}); }, 1500);
           resolve(url);
         }
       }
@@ -78,33 +107,52 @@ async function sniffStream(tmdbId) {
     try {
       await page.goto(`https://www.moviesnexus.fun/movie/${tmdbId}`, { waitUntil: 'domcontentloaded' });
       await new Promise(r => setTimeout(r, 6000));
+      
       const frames = page.frames();
       for (const frame of frames) {
         try {
           await frame.evaluate(() => {
-            document.querySelectorAll('button, .jw-display-icon-container, .vjs-big-play-button, #play, video').forEach(t => t.click());
-            const v = document.querySelector('video'); if (v) v.play().catch(()=>{});
+            const targets = document.querySelectorAll('button, .jw-display-icon-container, .vjs-big-play-button, #play, video');
+            targets.forEach(t => t.click());
+            const v = document.querySelector('video');
+            if (v) v.play().catch(() => {});
           });
         } catch (e) {}
       }
-    } catch (err) {}
+    } catch (err) {
+      console.log(`[!] Notice: ${err.message}`);
+    }
   });
 }
 
-// --- REST API: Receives Voice Command from Kotlin App ---
+// Click-to-Play Endpoint (Used by Netlify index.html)
+app.get('/resolve', async (req, res) => {
+  const tmdbId = req.query.tmdb || '550';
+  console.log(`[*] Manual click resolve for TMDB: ${tmdbId}`);
+  
+  const rawUrl = await sniffStream(tmdbId);
+  if (rawUrl) {
+    res.json({ status: 'ok', streamUrl: `/proxy-stream?url=${encodeURIComponent(rawUrl)}` });
+  } else {
+    res.status(404).json({ status: 'error', message: 'Stream not found' });
+  }
+});
+
+// Voice Remote Command Endpoint (Used by Phone app)
 app.post('/api/voice-command', async (req, res) => {
   const { roomCode, text } = req.body;
   if (!roomCode || !text) return res.status(400).json({ error: 'Missing roomCode or text' });
 
-  // 1. Tell TV we are processing
   io.to(roomCode).emit('assistant_update', { message: `"${text}"`, status: 'processing' });
-  res.json({ status: 'Processing started' }); // Free up phone immediately
+  res.json({ status: 'Processing started' });
 
   try {
-    // 2. Groq AI Intent Parsing
     const aiResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Authorization": "Bearer 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", "Content-Type": "application/json" },
+      headers: {
+        "Authorization": "Bearer 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",
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
         model: "openai/gpt-oss-20b",
         temperature: 0.0,
@@ -119,17 +167,13 @@ app.post('/api/voice-command', async (req, res) => {
     const aiData = await aiResp.json();
     const result = JSON.parse(aiData.choices[0].message.content);
 
-    // 3. Route to TV based on intent
     if (result.intent === 'weather') {
       io.to(roomCode).emit('execute_action', { action: 'weather' });
-    } 
-    else if (result.intent === 'suggestion') {
+    } else if (result.intent === 'suggestion') {
       io.to(roomCode).emit('execute_action', { action: 'search', query: result.query });
-    } 
-    else if (result.intent === 'play_media' && result.title) {
+    } else if (result.intent === 'play_media' && result.title) {
       io.to(roomCode).emit('assistant_update', { message: `Finding: ${result.title}`, status: 'loading' });
       
-      // Look up TMDB ID
       const tmdbReq = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=3fd2be6f0c70a2a598f084ddfb75487c&query=${encodeURIComponent(result.title)}`);
       const tmdbData = await tmdbReq.json();
       
@@ -138,7 +182,7 @@ app.post('/api/voice-command', async (req, res) => {
         const isSeries = (item.media_type === 'tv' || item.first_air_date);
         const resolveParam = isSeries ? `${item.id}/${result.season || 1}/${result.episode || 1}` : item.id;
         
-        io.to(roomCode).emit('assistant_update', { message: `Scraping Streams...`, status: 'scraping' });
+        io.to(roomCode).emit('assistant_update', { message: `Scraping stream...`, status: 'scraping' });
         
         const rawUrl = await sniffStream(resolveParam);
         if (rawUrl) {
@@ -157,5 +201,5 @@ app.post('/api/voice-command', async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Cloud WebSocket Server running on port ${PORT}`);
+  console.log(`✅ Cloud Server running on port ${PORT}`);
 });
