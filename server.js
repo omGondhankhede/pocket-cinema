@@ -50,7 +50,7 @@ app.get('/proxy-stream', async (req, res) => {
   }
 });
 
-// SMART PUPPETEER API-INTERCEPT RESOLVER
+// SMART PUPPETEER API-INTERCEPT RESOLVER WITH CLICK SIMULATION
 async function resolveViaPuppeteerIntercept(tmdbParam) {
   let browser;
   console.log(`\n[SmartResolver] Launching browser for target: ${tmdbParam}`);
@@ -79,13 +79,12 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
       const timer = setTimeout(async () => {
         if (!resolved) {
           resolved = true;
-          console.log(`[SmartResolver] ⚠️ Timeout reached (30s)`);
+          console.log(`[SmartResolver] ⚠️ Timeout reached (50s)`);
           if (browser) await browser.close().catch(() => {});
           resolve(null);
         }
-      }, 30000);
+      }, 50000);
 
-      // Intercept network responses to catch the extraction API payload instantly
       page.on('response', async (response) => {
         const url = response.url();
         try {
@@ -116,7 +115,16 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
       try {
         const targetUrl = `https://www.moviesnexus.fun/${tmdbParam.startsWith('tv/') ? tmdbParam : 'movie/' + tmdbParam}`;
         console.log(`[SmartResolver] Navigating to: ${targetUrl}`);
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 25000 });
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
+        
+        // Wait 4 seconds for scripts to mount, then simulate a click to trigger the extraction endpoint
+        await new Promise(r => setTimeout(r, 4000));
+        await page.evaluate(() => {
+          document.body.click();
+          const playBtn = document.querySelector('button, .play, .player, video');
+          if (playBtn) playBtn.click();
+        }).catch(() => {});
+
       } catch (err) {
         console.log(`[SmartResolver] Navigation notice: ${err.message}`);
       }
