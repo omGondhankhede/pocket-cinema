@@ -62,8 +62,8 @@ async function sniffStream(tmdbId) {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--disable-web-security', // Helps bypass iframe cross-origin blocks
-        '--disable-features=IsolateOrigins,site-per-process' // Allows clicking inside embedded players
+        '--disable-web-security', 
+        '--disable-features=IsolateOrigins,site-per-process' 
       ]
     });
 
@@ -71,18 +71,9 @@ async function sniffStream(tmdbId) {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 720 });
-    await page.setRequestInterception(true);
     
-    page.on('request', (req) => {
-      const type = req.resourceType();
-      if (['image', 'stylesheet', 'font'].includes(type)) {
-        req.abort();
-      } else {
-        req.continue();
-      }
-    });
+    // NOTE: Request interception is entirely removed here so Cloudflare can load its verification scripts.
 
-    // Log any internal page errors
     page.on('console', msg => {
       if (msg.type() === 'error') console.log(`[Page Console Error] ${msg.text()}`);
     });
@@ -90,15 +81,16 @@ async function sniffStream(tmdbId) {
     return new Promise(async (resolve) => {
       let resolved = false;
 
+      // Increased overall fallback timer to 75 seconds to account for the 60s goto + waits
       const timer = setTimeout(async () => {
         if (!resolved) {
-          console.log(`[Puppeteer] ⚠️ Timeout reached (45s). Current URL: ${page.url()}`);
+          console.log(`[Puppeteer] ⚠️ Timeout reached (75s). Current URL: ${page.url()}`);
           const title = await page.title().catch(() => 'Unknown');
           console.log(`[Puppeteer] ⚠️ Page title at timeout: "${title}"`);
           if (browser) await browser.close().catch(() => {});
           resolve({ error: `Timeout. Page title was: ${title}` });
         }
-      }, 45000);
+      }, 75000);
 
       page.on('response', async (response) => {
         const url = response.url();
@@ -116,16 +108,24 @@ async function sniffStream(tmdbId) {
       try {
         const targetUrl = `https://www.moviesnexus.fun/movie/${tmdbId}`;
         console.log(`[Puppeteer] Navigating to: ${targetUrl}`);
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
         
+        // Increased timeout to 60 seconds. Cloudflare loading loops can take time.
+        await page.goto(targetUrl, { timeout: 60000 }); 
+        
+      } catch (navErr) {
+        // Catch the timeout gracefully instead of crashing the server
+        console.log(`[Puppeteer] ⚠️ Goto timed out or hung up, checking if player loaded anyway...`);
+      }
+
+      try {
         const title = await page.title();
-        console.log(`[Puppeteer] Page loaded successfully. Title: "${title}"`);
+        console.log(`[Puppeteer] Page check. Title: "${title}"`);
         
         if (title.toLowerCase().includes('just a moment') || title.toLowerCase().includes('cloudflare')) {
-          console.log(`[Puppeteer] ❌ BLOCKED BY CLOUDFLARE.`);
+          console.log(`[Puppeteer] ❌ STILL BLOCKED BY CLOUDFLARE.`);
         }
 
-        console.log(`[Puppeteer] Waiting 6 seconds for video players and iframes to load...`);
+        console.log(`[Puppeteer] Waiting 6 seconds for video players and iframes to settle...`);
         await new Promise(r => setTimeout(r, 6000));
         
         const frames = page.frames();
@@ -143,14 +143,12 @@ async function sniffStream(tmdbId) {
               return count;
             });
             clicks += clicked;
-          } catch (e) {
-            // Ignore individual frame security errors
-          }
+          } catch (e) {}
         }
-        console.log(`[Puppeteer] Performed ${clicks} interaction attempts across all frames. Waiting for video network traffic...`);
+        console.log(`[Puppeteer] Performed ${clicks} interaction attempts across all frames. Waiting for network traffic...`);
 
       } catch (err) {
-        console.log(`[Puppeteer] ❌ Navigation/Execution Error: ${err.message}`);
+        console.log(`[Puppeteer] ❌ Execution Error: ${err.message}`);
         if (!resolved) {
           resolved = true;
           clearTimeout(timer);
