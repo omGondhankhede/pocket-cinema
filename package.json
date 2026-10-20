@@ -8,7 +8,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "puppeteer-real-browser": "^1.4.4",
+    "puppeteer-core": "^22.0.0",
     "socket.io": "^4.7.5"
   }
 }
