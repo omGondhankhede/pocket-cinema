@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Root health check so you don't get "Cannot GET /"
+// Root health check
 app.get('/', (req, res) => {
   res.send('PocketFlix Cinema Backend is Live & Running!');
 });
@@ -55,90 +55,103 @@ app.get('/proxy-stream', async (req, res) => {
   }
 });
 
-// Stream Sniffer (Headless Puppeteer with low RAM usage)
+// Stream Sniffer (Xvfb Disabled & Headless Patched)
 async function sniffStream(tmdbId) {
-  const { browser, page } = await connect({
-    headless: false,
-    turnstile: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--single-process'
-    ]
-  });
+  let browserInstance;
+  try {
+    const { browser, page } = await connect({
+      headless: 'new', // Forces invisible mode to prevent screen crashes
+      disableXvfb: true, // Bypasses Render's lack of Linux screen managers
+      turnstile: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--single-process'
+      ]
+    });
+    browserInstance = browser;
 
-  await page.setViewport({ width: 800, height: 600 });
-  await page.setRequestInterception(true);
-  
-  page.on('request', (req) => {
-    const type = req.resourceType();
-    const blockList = ['googlesyndication.com', 'google-analytics.com', 'doubleclick.net', 'popads.net'];
-    if (['image', 'stylesheet', 'font'].includes(type) || blockList.some(domain => req.url().includes(domain))) {
-      req.abort();
-    } else {
-      req.continue();
-    }
-  });
-
-  return new Promise(async (resolve) => {
-    let resolved = false;
-
-    const timer = setTimeout(async () => {
-      if (!resolved) {
-        await browser.close().catch(() => {});
-        resolve(null);
-      }
-    }, 45000);
-
-    page.on('response', async (response) => {
-      const url = response.url();
-      if ((url.includes('.m3u8') || url.includes('.mp4')) && !url.includes('google')) {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timer);
-          setTimeout(async () => { await browser.close().catch(() => {}); }, 1500);
-          resolve(url);
-        }
+    await page.setViewport({ width: 800, height: 600 });
+    await page.setRequestInterception(true);
+    
+    page.on('request', (req) => {
+      const type = req.resourceType();
+      const blockList = ['googlesyndication.com', 'google-analytics.com', 'doubleclick.net', 'popads.net'];
+      if (['image', 'stylesheet', 'font'].includes(type) || blockList.some(domain => req.url().includes(domain))) {
+        req.abort();
+      } else {
+        req.continue();
       }
     });
 
-    try {
-      await page.goto(`https://www.moviesnexus.fun/movie/${tmdbId}`, { waitUntil: 'domcontentloaded' });
-      await new Promise(r => setTimeout(r, 6000));
-      
-      const frames = page.frames();
-      for (const frame of frames) {
-        try {
-          await frame.evaluate(() => {
-            const targets = document.querySelectorAll('button, .jw-display-icon-container, .vjs-big-play-button, #play, video');
-            targets.forEach(t => t.click());
-            const v = document.querySelector('video');
-            if (v) v.play().catch(() => {});
-          });
-        } catch (e) {}
+    return new Promise(async (resolve) => {
+      let resolved = false;
+
+      const timer = setTimeout(async () => {
+        if (!resolved) {
+          if (browserInstance) await browserInstance.close().catch(() => {});
+          resolve(null);
+        }
+      }, 45000);
+
+      page.on('response', async (response) => {
+        const url = response.url();
+        if ((url.includes('.m3u8') || url.includes('.mp4')) && !url.includes('google')) {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timer);
+            setTimeout(async () => { if (browserInstance) await browserInstance.close().catch(() => {}); }, 1500);
+            resolve(url);
+          }
+        }
+      });
+
+      try {
+        await page.goto(`https://www.moviesnexus.fun/movie/${tmdbId}`, { waitUntil: 'domcontentloaded' });
+        await new Promise(r => setTimeout(r, 6000));
+        
+        const frames = page.frames();
+        for (const frame of frames) {
+          try {
+            await frame.evaluate(() => {
+              const targets = document.querySelectorAll('button, .jw-display-icon-container, .vjs-big-play-button, #play, video');
+              targets.forEach(t => t.click());
+              const v = document.querySelector('video');
+              if (v) v.play().catch(() => {});
+            });
+          } catch (e) {}
+        }
+      } catch (err) {
+        console.log(`[!] Page Error: ${err.message}`);
       }
-    } catch (err) {
-      console.log(`[!] Notice: ${err.message}`);
-    }
-  });
+    });
+  } catch (err) {
+    if (browserInstance) await browserInstance.close().catch(() => {});
+    throw err; // Send error to the router instead of crashing the app
+  }
 }
 
-// Click-to-Play Endpoint (Used by Netlify index.html)
+// Click-to-Play Endpoint 
 app.get('/resolve', async (req, res) => {
   const tmdbId = req.query.tmdb || '550';
   console.log(`[*] Manual click resolve for TMDB: ${tmdbId}`);
   
-  const rawUrl = await sniffStream(tmdbId);
-  if (rawUrl) {
-    res.json({ status: 'ok', streamUrl: `/proxy-stream?url=${encodeURIComponent(rawUrl)}` });
-  } else {
-    res.status(404).json({ status: 'error', message: 'Stream not found' });
+  try {
+    const rawUrl = await sniffStream(tmdbId);
+    if (rawUrl) {
+      res.json({ status: 'ok', streamUrl: `/proxy-stream?url=${encodeURIComponent(rawUrl)}` });
+    } else {
+      res.status(404).json({ status: 'error', message: 'Stream not found or blocked by Cloudflare' });
+    }
+  } catch (err) {
+    console.error(`[!] Backend Crash Prevented: ${err.message}`);
+    res.status(500).json({ status: 'error', message: err.message });
   }
 });
 
-// Voice Remote Command Endpoint (Used by Phone app)
+// Voice Remote Command Endpoint
 app.post('/api/voice-command', async (req, res) => {
   const { roomCode, text } = req.body;
   if (!roomCode || !text) return res.status(400).json({ error: 'Missing roomCode or text' });
