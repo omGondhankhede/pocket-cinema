@@ -20,7 +20,6 @@ app.get('/', (req, res) => {
   res.send('PocketFlix Cinema Backend is Live & Running!');
 });
 
-// Muted noisy socket logs
 io.on('connection', (socket) => {
   socket.on('join_room', (roomCode) => {
     socket.join(roomCode);
@@ -71,7 +70,7 @@ app.get('/proxy-stream', async (req, res) => {
 
 async function resolveViaPuppeteerIntercept(tmdbParam) {
   let browser;
-  console.log(`\n[SmartResolver] Launching Stealth/Anti-Bot browser for: ${tmdbParam}`);
+  console.log(`\n[SmartResolver] Launching Stealth Browser with RAW LOGS for: ${tmdbParam}`);
 
   try {
     browser = await puppeteer.launch({
@@ -92,18 +91,38 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
 
     const page = await browser.newPage();
     
-    // Completely disables Content Security Policy on the page
+    // Bypass CSP
     await page.setBypassCSP(true); 
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 720 });
 
-    // 🔥 NEUTRALIZE THE DEVTOOLS DETECTOR BEFORE IT LOADS 🔥
+    // Anti-Bot DevTools Override
     await page.evaluateOnNewDocument(() => {
       window.__DISABLE_DEVTOOL_HOOK__ = true;
       Object.defineProperty(window, 'outerWidth', { get: () => window.innerWidth });
       Object.defineProperty(window, 'outerHeight', { get: () => window.innerHeight });
-      window.console.clear = () => {}; // Stop them from clearing our logs
+      window.console.clear = () => {}; 
     });
+
+    // ==========================================
+    // RAW DIAGNOSTIC LOGGING HOOKS
+    // ==========================================
+    page.on('console', msg => {
+      console.log(`[Browser Console] ${msg.type().toUpperCase()}: ${msg.text()}`);
+    });
+
+    page.on('pageerror', err => {
+      console.log(`[Browser PageError] CRASH: ${err.toString()}`);
+    });
+
+    page.on('requestfailed', request => {
+      const url = request.url();
+      const errText = request.failure()?.errorText || 'Unknown error';
+      if (!url.includes('google-analytics')) {
+        console.log(`[Browser Network Fail] BLOCKED: ${url.substring(0, 80)}... -> Reason: ${errText}`);
+      }
+    });
+    // ==========================================
 
     return new Promise(async (resolve) => {
       let resolved = false;
@@ -119,8 +138,21 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
         }
       };
 
-      const timer = setTimeout(() => {
-        console.log(`[SmartResolver] ⚠️ Timeout reached (50s)`);
+      const timer = setTimeout(async () => {
+        console.log(`\n[SmartResolver] ⚠️ TIMEOUT REACHED (50s) - DUMPING RAW STATE`);
+        try {
+          const currentUrl = page.url();
+          console.log(`[Raw State] Final URL: ${currentUrl}`);
+          
+          const frames = page.frames();
+          console.log(`[Raw State] Total Iframes detected: ${frames.length}`);
+          frames.forEach((f, i) => console.log(`[Raw State] Frame ${i} URL: ${f.url()}`));
+          
+          const htmlSnippet = await page.evaluate(() => document.documentElement.outerHTML.substring(0, 2000));
+          console.log(`[Raw State] HTML DOM Snippet:\n${htmlSnippet}\n========================\n`);
+        } catch (e) {
+          console.log(`[Raw State] Failed to dump DOM: ${e.stack}`);
+        }
         finish(null);
       }, 50000);
 
@@ -151,9 +183,8 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
         console.log(`[SmartResolver] Navigating to: ${targetUrl}`);
         
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
-        console.log(`[SmartResolver] Page loaded. Bypassing devtools detection...`);
+        console.log(`[SmartResolver] Page loaded. Starting aggressive click loop...`);
 
-        // Aggressive click loop to trigger native players
         clickInterval = setInterval(async () => {
           if (resolved) return;
           try {
