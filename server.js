@@ -37,7 +37,7 @@ app.get('/proxy-stream', async (req, res) => {
     const upstreamRes = await fetch(targetUrl, {
       headers: {
         'Referer': 'https://www.moviesnexus.fun/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
 
@@ -70,7 +70,7 @@ app.get('/proxy-stream', async (req, res) => {
 
 async function resolveViaPuppeteerIntercept(tmdbParam) {
   let browser;
-  console.log(`\n[SmartResolver] Launching CSP-Bypass browser for: ${tmdbParam}`);
+  console.log(`\n[SmartResolver] Launching CSP-Bypass browser with RAW LOGS for: ${tmdbParam}`);
 
   try {
     browser = await puppeteer.launch({
@@ -91,12 +91,33 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
 
     const page = await browser.newPage();
     
-    // 🔥 THE MAGIC FIX FOR THE CSP ERROR 🔥
-    // Completely disables Content Security Policy on the page, allowing the internal API to execute.
+    // Completely disables Content Security Policy
     await page.setBypassCSP(true); 
-    
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 720 });
+
+    // ==========================================
+    // RAW DIAGNOSTIC LOGGING HOOKS
+    // ==========================================
+    page.on('console', msg => {
+      // Ignore routine noise
+      if (!msg.text().includes('Failed to load resource')) {
+        console.log(`[Browser Console] ${msg.type().toUpperCase()}: ${msg.text()}`);
+      }
+    });
+
+    page.on('pageerror', err => {
+      console.log(`[Browser PageError] CRASH: ${err.toString()}`);
+    });
+
+    page.on('requestfailed', request => {
+      const url = request.url();
+      const errText = request.failure()?.errorText || 'Unknown error';
+      // Only log fails for the actual domain or API, ignore random ad-blocker fails
+      if (url.includes('moviesnexus') || url.includes('/api/')) {
+        console.log(`[Browser Network Fail] BLOCKED: ${url} -> Reason: ${errText}`);
+      }
+    });
 
     return new Promise(async (resolve) => {
       let resolved = false;
@@ -112,8 +133,22 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
         }
       };
 
-      const timer = setTimeout(() => {
-        console.log(`[SmartResolver] ⚠️ Timeout reached (50s)`);
+      const timer = setTimeout(async () => {
+        console.log(`\n[SmartResolver] ⚠️ TIMEOUT REACHED (50s) - DUMPING RAW STATE`);
+        try {
+          const currentUrl = page.url();
+          console.log(`[Raw State] Final URL: ${currentUrl}`);
+          
+          const frames = page.frames();
+          console.log(`[Raw State] Total Iframes detected: ${frames.length}`);
+          frames.forEach((f, i) => console.log(`[Raw State] Frame ${i} URL: ${f.url()}`));
+          
+          // Grab the first 1500 characters of the HTML to see what's actually rendering
+          const htmlSnippet = await page.evaluate(() => document.documentElement.outerHTML.substring(0, 1500));
+          console.log(`[Raw State] HTML DOM Snippet:\n${htmlSnippet}\n========================\n`);
+        } catch (e) {
+          console.log(`[Raw State] Failed to dump DOM: ${e.stack}`);
+        }
         finish(null);
       }, 50000);
 
@@ -164,11 +199,11 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
         }, 2000); 
 
       } catch (err) {
-        console.log(`[SmartResolver] Navigation notice: ${err.message}`);
+        console.log(`[SmartResolver] Navigation notice: ${err.stack}`);
       }
     });
   } catch (err) {
-    console.error(`[SmartResolver] Browser Error: ${err.message}`);
+    console.error(`[SmartResolver] Browser Error: ${err.stack}`);
     if (browser) await browser.close().catch(() => {});
     return null;
   }
