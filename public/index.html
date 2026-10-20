@@ -185,7 +185,7 @@
       console.log('Socket disconnected.');
     }
 
-    // AI BRAIN ROUTING
+    // AI ROUTING
     async function processVoiceQuery(query) {
       var lower = query.toLowerCase().trim();
       
@@ -217,7 +217,7 @@
             "Authorization": "Bearer " + GROQ_API_KEY
           },
           body: JSON.stringify({
-            model: "llama3-8b-8192", 
+            model: "openai/gpt-oss-20b", 
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: query }
