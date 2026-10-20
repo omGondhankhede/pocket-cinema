@@ -159,7 +159,6 @@
       }
     }
 
-    // UI ASSISTANT LOGIC
     var assistantHideTimeout = null;
     function showAssistant(text) {
       clearTimeout(assistantHideTimeout);
@@ -185,7 +184,7 @@
       console.log('Socket disconnected.');
     }
 
-    // AI ROUTING
+    // SMART AI ROUTING
     async function processVoiceQuery(query) {
       var lower = query.toLowerCase().trim();
       
@@ -205,9 +204,9 @@
       showAssistant("✨ Thinking...");
       playBeep('start');
       
-      const systemPrompt = `You are the AI brain of PocketFlix. You output strictly in JSON format. 
-      If the user wants to play, watch, or start a movie/show, output: {"intent": "play", "title": "the movie name"}
-      If the user asks a question, output: {"intent": "chat", "answer": "your short answer"}`;
+      const systemPrompt = `You are the smart AI brain of PocketFlix. You understand natural language, context, and media titles deeply. You output strictly in JSON format.
+      - If the user wants to play, watch, or stream a movie/show (even with complex or conversational phrasing like "can you play the latest minecraft movie"), strip away conversational filler words (like "latest", "movie", "show", "can you play") and extract ONLY the clean core title name. Output: {"intent": "play", "title": "core title"}
+      - If the user asks any other general or personal question, output: {"intent": "chat", "answer": "your short, clever answer"}`;
 
       try {
         const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -223,12 +222,11 @@
               { role: "user", content: query }
             ],
             response_format: { type: "json_object" },
-            temperature: 0.2
+            temperature: 0.1
           })
         });
         
         const data = await response.json();
-        
         if (data.error) {
             showAssistant("AI Error: " + data.error.message);
             assistantHideTimeout = setTimeout(hideAssistant, 6000);
@@ -237,10 +235,8 @@
 
         if (data.choices && data.choices.length > 0) {
           const aiResponse = data.choices[0].message.content;
-          
           try {
               const parsed = JSON.parse(aiResponse);
-              
               if (parsed.intent === 'play' && parsed.title) {
                   showAssistant("🎬 Finding: " + parsed.title);
                   fetchTmdbIdAndPlay(parsed.title);
@@ -265,6 +261,7 @@
       }
     }
 
+    // SMART TMDB SEARCH WITH FALLBACK
     function fetchTmdbIdAndPlay(title) {
       var xhr = new XMLHttpRequest();
       xhr.open('GET', 'https://api.themoviedb.org/3/search/multi?api_key=' + TMDB_API_KEY + '&query=' + encodeURIComponent(title), true);
@@ -272,13 +269,39 @@
         if (xhr.status === 200) {
           var resp = JSON.parse(xhr.responseText);
           var results = (resp.results || []).filter(item => item.media_type !== 'person' && item.poster_path);
+          
           if (results.length > 0) {
             var item = results[0];
-            var mediaTitle = item.title || item.name;
             hideAssistant();
-            playMovie(item.id, mediaTitle); 
+            playMovie(item.id, item.title || item.name); 
           } else {
-            showAssistant("Couldn't find '" + title + "' in TMDB.");
+            // FALLBACK: If exact phrase fails, split into keywords and try the first major word (e.g. "Minecraft")
+            var fallbackKeyword = title.split(' ')[0];
+            if (fallbackKeyword && fallbackKeyword.toLowerCase() !== title.toLowerCase()) {
+                fetchTmdbIdAndPlayFallback(fallbackKeyword, title);
+            } else {
+                showAssistant("Couldn't find '" + title + "' in TMDB.");
+                assistantHideTimeout = setTimeout(hideAssistant, 4000);
+            }
+          }
+        }
+      };
+      xhr.send();
+    }
+
+    function fetchTmdbIdAndPlayFallback(keyword, originalTitle) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'https://api.themoviedb.org/3/search/multi?api_key=' + TMDB_API_KEY + '&query=' + encodeURIComponent(keyword), true);
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          var resp = JSON.parse(xhr.responseText);
+          var results = (resp.results || []).filter(item => item.media_type !== 'person' && item.poster_path);
+          if (results.length > 0) {
+            var item = results[0];
+            hideAssistant();
+            playMovie(item.id, item.title || item.name);
+          } else {
+            showAssistant("Couldn't find '" + originalTitle + "'.");
             assistantHideTimeout = setTimeout(hideAssistant, 4000);
           }
         }
@@ -289,42 +312,20 @@
     // TV MIC DETECTOR
     function triggerVoiceSearch() {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        
         if (!SpeechRecognition) {
             showToast("No TV Mic detected. Use your Phone App.");
             showAssistant("Waiting for Phone Audio...");
             return;
         }
-        
         try {
             const recognition = new SpeechRecognition();
             recognition.lang = 'en-US';
             recognition.interimResults = false;
-            
-            recognition.onstart = () => {
-                showAssistant("Listening...");
-                playBeep('start');
-            };
-
-            recognition.onresult = (event) => {
-                const query = event.results[0][0].transcript;
-                console.log("Heard locally:", query);
-                processVoiceQuery(query); 
-            };
-            
-            recognition.onerror = (event) => {
-                if (event.error === 'no-speech' || event.error === 'audio-capture' || event.error === 'not-allowed') {
-                    showToast("No TV Mic active. Speak into your Phone App.");
-                    showAssistant("Waiting for Phone Audio...");
-                } else {
-                    showAssistant("Voice check failed: " + event.error);
-                    assistantHideTimeout = setTimeout(hideAssistant, 3000);
-                }
-            };
-            
+            recognition.onstart = () => { showAssistant("Listening..."); playBeep('start'); };
+            recognition.onresult = (event) => { processVoiceQuery(event.results[0][0].transcript); };
+            recognition.onerror = (event) => { showAssistant("Waiting for Phone Audio..."); };
             recognition.start();
         } catch(err) {
-            showToast("TV Mic access denied. Use your Phone.");
             showAssistant("Waiting for Phone Audio...");
         }
     }
@@ -372,43 +373,33 @@
     function fetchCatalog(append) {
       if (isLoadingMore) return;
       isLoadingMore = true;
-
       var grid = document.getElementById('homeGrid');
       if (!append) {
         grid.innerHTML = '<div class="loading-pulse">Loading Cinema Catalog...</div>';
         currentItems = [];
         currentIndex = 0;
       }
-
       var xhr = new XMLHttpRequest();
       xhr.open('GET', getApiUrl(), true);
       xhr.onload = function() {
         isLoadingMore = false;
         if (xhr.status === 200) {
           var resp = JSON.parse(xhr.responseText);
-          var results = resp.results || [];
-          totalPages = resp.total_pages || 1;
-          renderGrid(results, append);
+          renderGrid(resp.results || [], append);
         }
       };
-      xhr.onerror = function() {
-        isLoadingMore = false;
-      };
+      xhr.onerror = function() { isLoadingMore = false; };
       xhr.send();
     }
 
     function renderGrid(items, append) {
       var grid = document.getElementById('homeGrid');
       if (!append) grid.innerHTML = '';
-
       for (var i = 0; i < items.length; i++) {
         var item = items[i];
-        if (!item.poster_path) continue;
-        if (item.media_type === 'person') continue;
-
+        if (!item.poster_path || item.media_type === 'person') continue;
         currentItems.push(item);
         var cardIndex = currentItems.length - 1;
-
         var title = item.title || item.name || 'Untitled';
         var dateStr = (item.release_date || item.first_air_date || 'N/A').split('-')[0];
         var rating = item.vote_average ? item.vote_average.toFixed(1) : 'NR';
@@ -419,33 +410,18 @@
         card.innerHTML = '<div class="poster"><img src="https://image.tmdb.org/t/p/w342' + item.poster_path + '"></div>' +
                          '<div class="card-title">' + title + '</div>' +
                          '<div class="card-sub">' + dateStr + ' · <span class="star-rating">★</span> ' + rating + '</div>';
-
-        card.onclick = (function(idx) {
-          return function() {
-            highlightCard(idx);
-            selectCurrentCard();
-          };
-        })(cardIndex);
-
+        card.onclick = (function(idx) { return function() { highlightCard(idx); selectCurrentCard(); }; })(cardIndex);
         grid.appendChild(card);
       }
-
-      if (!append && currentItems.length > 0) {
-        updateHeroSpotlight(currentItems[0]);
-      }
+      if (!append && currentItems.length > 0) updateHeroSpotlight(currentItems[0]);
     }
 
-    // INFINITE SCROLL
     window.addEventListener('scroll', function() {
       var scrollPos = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
       var viewHeight = window.innerHeight || document.documentElement.clientHeight || 720;
       var docHeight = document.body.offsetHeight || document.documentElement.scrollHeight || 0;
-      
       if ((viewHeight + scrollPos) >= docHeight - 500) {
-        if (!isLoadingMore && currentPage < totalPages) {
-          currentPage++;
-          fetchCatalog(true);
-        }
+        if (!isLoadingMore && currentPage < totalPages) { currentPage++; fetchCatalog(true); }
       }
     });
 
@@ -460,65 +436,43 @@
       document.getElementById('heroTitle').innerText = title;
       document.getElementById('heroMeta').innerText = '★ ' + rating + ' TMDB  ·  ' + dateStr +  '  ·  Press [5/OK] to Play';
       document.getElementById('heroDesc').innerText = item.overview || 'No description available.';
-
       var bgPath = item.backdrop_path || item.poster_path;
-      if (bgPath) {
-        document.getElementById('heroBanner').style.backgroundImage = 'url(https://image.tmdb.org/t/p/w780' + bgPath + ')';
-      }
+      if (bgPath) document.getElementById('heroBanner').style.backgroundImage = 'url(https://image.tmdb.org/t/p/w780' + bgPath + ')';
     }
 
     function highlightCard(newIndex) {
       if (currentItems.length === 0) return;
       if (newIndex < 0) newIndex = 0;
       if (newIndex >= currentItems.length) newIndex = currentItems.length - 1;
-
       var oldCard = document.getElementById('card-' + currentIndex);
       if (oldCard) oldCard.className = 'card';
-
       currentIndex = newIndex;
       var newCard = document.getElementById('card-' + currentIndex);
       if (newCard) {
         newCard.className = 'card active-card';
         updateHeroSpotlight(currentItems[currentIndex]);
-
-        var absoluteTop = 0;
-        var el = newCard;
-        while (el) {
-          absoluteTop += el.offsetTop;
-          el = el.offsetParent;
-        }
-
+        var absoluteTop = 0, el = newCard;
+        while (el) { absoluteTop += el.offsetTop; el = el.offsetParent; }
         var scrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
         var viewHeight = window.innerHeight || document.documentElement.clientHeight || 720;
-        
-        if (absoluteTop < 450) {
-          window.scrollTo(0, 0);
-        } else if (absoluteTop > scrollY + viewHeight - 200 || absoluteTop < scrollY + 80) {
-          window.scrollTo(0, absoluteTop - (viewHeight / 2) + 150);
-        }
+        if (absoluteTop < 450) window.scrollTo(0, 0);
+        else if (absoluteTop > scrollY + viewHeight - 200 || absoluteTop < scrollY + 80) window.scrollTo(0, absoluteTop - (viewHeight / 2) + 150);
       }
     }
 
     function showToast(msg) {
       var t = document.getElementById("statusToast");
-      if (t) {
-        t.innerText = msg;
-        t.style.display = "block";
-        setTimeout(function() { t.style.display = "none"; }, 4000);
-      }
+      if (t) { t.innerText = msg; t.style.display = "block"; setTimeout(function() { t.style.display = "none"; }, 4000); }
     }
 
     function selectCurrentCard() {
       var item = currentItems[currentIndex];
       if (!item) return;
-      var title = item.title || item.name || 'Movie';
-      playMovie(item.id, title);
+      playMovie(item.id, item.title || item.name || 'Movie');
     }
 
-    // RESOLVE & STREAM
     function playMovie(tmdbId, title) {
       showToast('⚡ Sniffing stream for "' + title + '"...');
-
       var xhr = new XMLHttpRequest();
       xhr.open('GET', BACKEND_URL + '/resolve?tmdb=' + tmdbId, true);
       xhr.onload = function() {
@@ -527,20 +481,10 @@
             var data = JSON.parse(xhr.responseText);
             if (data.status === 'ok' && data.streamUrl) {
               showToast('▶ Playing "' + title + '"');
-              var finalUrl = data.streamUrl.startsWith('http') ? data.streamUrl : (BACKEND_URL + data.streamUrl);
-              startVideo(finalUrl);
-            } else {
-              showToast('❌ Could not resolve stream link.');
-            }
-          } catch(e) {
-            showToast('❌ Error parsing server response.');
-          }
-        } else {
-          showToast('❌ Server error.');
-        }
-      };
-      xhr.onerror = function() {
-        showToast('❌ Server connection failed.');
+              startVideo(data.streamUrl.startsWith('http') ? data.streamUrl : (BACKEND_URL + data.streamUrl));
+            } else { showToast('❌ Could not resolve stream link.'); }
+          } catch(e) { showToast('❌ Error parsing response.'); }
+        } else { showToast('❌ Server error.'); }
       };
       xhr.send();
     }
@@ -549,24 +493,17 @@
       var modal = document.getElementById("playerModal");
       var video = document.getElementById("tvPlayer");
       if (modal) modal.style.display = "block";
-
       if (window.Hls && Hls.isSupported() && url.indexOf(".m3u8") !== -1) {
         if (hlsInstance) hlsInstance.destroy();
         hlsInstance = new Hls();
         hlsInstance.loadSource(url);
         hlsInstance.attachMedia(video);
-        hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() { 
-          if (video) video.play(); 
-        });
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() { if (video) video.play(); });
       } else {
-        if (video) {
-          video.src = url;
-          video.play();
-        }
+        if (video) { video.src = url; video.play(); }
       }
     }
 
-    // REMOTE CONTROLLER EVENT HANDLER
     window.addEventListener('keydown', function(e) {
       initAudio();
       var modal = document.getElementById("playerModal");
@@ -577,70 +514,21 @@
         if (code === 27 || code === 10009 || code === 8 || key === 'Escape') {
           e.preventDefault();
           var video = document.getElementById("tvPlayer");
-          if (video) {
-            video.pause();
-            video.src = "";
-          }
+          if (video) { video.pause(); video.src = ""; }
           if (hlsInstance) hlsInstance.destroy();
           modal.style.display = "none";
         }
         return;
       }
-
-      if (document.activeElement === document.getElementById('searchInput')) {
-        return;
-      }
-
-      if (code === 48 || code === 96 || key === '0') {
-        e.preventDefault();
-        triggerVoiceSearch();
-        return;
-      }
-
-      if (code === 403 || key === 'ColorF0Red' || key === 'Red' || code === 82) {
-        e.preventDefault();
-        switchCategory('home');
-        return;
-      }
-      if (code === 404 || key === 'ColorF1Green' || key === 'Green' || code === 71) {
-        e.preventDefault();
-        switchCategory('movies');
-        return;
-      }
-      if (code === 405 || key === 'ColorF2Yellow' || key === 'Yellow' || code === 89) {
-        e.preventDefault();
-        switchCategory('series');
-        return;
-      }
-      if (code === 406 || key === 'ColorF3Blue' || key === 'Blue' || code === 66) {
-        e.preventDefault();
-        switchCategory('bollywood');
-        return;
-      }
-
-      if (code === 57 || code === 105 || key === '9' || code === 116) {
-        e.preventDefault();
-        window.location.reload();
-        return;
-      }
+      if (document.activeElement === document.getElementById('searchInput')) return;
+      if (code === 48 || code === 96 || key === '0') { e.preventDefault(); triggerVoiceSearch(); return; }
 
       var cols = 5;
-      if (code === 52 || code === 100 || key === '4') {
-        e.preventDefault();
-        highlightCard(currentIndex - 1);
-      } else if (code === 54 || code === 102 || key === '6') {
-        e.preventDefault();
-        highlightCard(currentIndex + 1);
-      } else if (code === 56 || code === 104 || key === '8') {
-        e.preventDefault();
-        highlightCard(currentIndex + cols);
-      } else if (code === 50 || code === 98 || key === '2') {
-        e.preventDefault();
-        highlightCard(currentIndex - cols);
-      } else if (code === 53 || code === 101 || key === '5' || code === 13) {
-        e.preventDefault();
-        selectCurrentCard();
-      }
+      if (code === 52 || code === 100 || key === '4') { e.preventDefault(); highlightCard(currentIndex - 1); }
+      else if (code === 54 || code === 102 || key === '6') { e.preventDefault(); highlightCard(currentIndex + 1); }
+      else if (code === 56 || code === 104 || key === '8') { e.preventDefault(); highlightCard(currentIndex + cols); }
+      else if (code === 50 || code === 98 || key === '2') { e.preventDefault(); highlightCard(currentIndex - cols); }
+      else if (code === 53 || code === 101 || key === '5' || code === 13) { e.preventDefault(); selectCurrentCard(); }
     });
 
     fetchCatalog(false);
