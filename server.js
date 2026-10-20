@@ -20,7 +20,6 @@ app.get('/', (req, res) => {
   res.send('PocketFlix Cinema Backend is Live & Running!');
 });
 
-// Muted the noisy socket logs so health-checkers don't spam your console
 io.on('connection', (socket) => {
   socket.on('join_room', (roomCode) => {
     socket.join(roomCode);
@@ -71,10 +70,10 @@ app.get('/proxy-stream', async (req, res) => {
   }
 });
 
-// AGGRESSIVE PUPPETEER NETWORK INTERCEPTOR
+// HEADLESS AUTOPLAY INTERCEPTOR (No Xvfb required)
 async function resolveViaPuppeteerIntercept(tmdbParam) {
   let browser;
-  console.log(`\n[SmartResolver] Launching browser for target: ${tmdbParam}`);
+  console.log(`\n[SmartResolver] Launching stealth headless browser for: ${tmdbParam}`);
 
   try {
     browser = await puppeteer.launch({
@@ -87,7 +86,9 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
         '--disable-web-security',
         '--allow-running-insecure-content',
         '--disable-features=IsolateOrigins,site-per-process',
-        '--window-size=1280,720'
+        '--window-size=1280,720',
+        '--autoplay-policy=no-user-gesture-required', // Forces video to play automatically
+        '--mute-audio' // Browsers allow autoplay without clicks IF the audio is muted!
       ]
     });
 
@@ -110,7 +111,6 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
       page.on('response', async (response) => {
         const url = response.url();
         try {
-          // 1. Catch API extraction payload
           if (url.includes('/api/extract') && response.status() === 200) {
             const data = await response.json();
             if (!resolved && data) {
@@ -124,11 +124,10 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
               }
             }
           } 
-          // 2. Catch raw master.m3u8 or index.m3u8 files directly if the API is bypassed
           else if ((url.includes('.m3u8') || url.includes('.mp4')) && !url.includes('google') && !url.includes('empty')) {
             if (!resolved) {
               resolved = true;
-              console.log(`[SmartResolver] ✅ CAUGHT DIRECT M3U8 URL!`);
+              console.log(`[SmartResolver] ✅ CAUGHT DIRECT MEDIA URL!`);
               clearTimeout(timer);
               setTimeout(async () => { if (browser) await browser.close().catch(() => {}); }, 1000);
               resolve(url);
@@ -142,26 +141,7 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
         console.log(`[SmartResolver] Navigating to: ${targetUrl}`);
         
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
-        
-        console.log(`[SmartResolver] Page loaded. Injecting auto-play scripts...`);
-        await new Promise(r => setTimeout(r, 2000));
-        
-        // Aggressive interaction: click center of screen, trigger play events
-        await page.evaluate(() => {
-          document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)?.click();
-          document.querySelectorAll('video').forEach(v => v.play().catch(()=>{}));
-          document.querySelectorAll('.play-btn, button, .vjs-big-play-button, .jw-icon-display').forEach(b => b.click());
-        }).catch(() => {});
-
-        // Drill into iframes and click to trigger the stream
-        for (const frame of page.frames()) {
-          try {
-            await frame.evaluate(() => {
-              document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)?.click();
-              document.querySelectorAll('video').forEach(v => v.play().catch(()=>{}));
-            });
-          } catch (e) {}
-        }
+        console.log(`[SmartResolver] Page loaded. Muted autoplay should trigger stream...`);
 
       } catch (err) {
         console.log(`[SmartResolver] Navigation notice: ${err.message}`);
