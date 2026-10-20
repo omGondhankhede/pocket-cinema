@@ -12,25 +12,30 @@
     ::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
     html, body { margin: 0; padding: 0; background-color: #050507; color: #f0f2f5; font-family: 'Montserrat', sans-serif; overflow-x: hidden; height: 100%; }
     button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
-    .nav-wrap { position: fixed; top: 0; left: 0; right: 0; height: 72px; z-index: 100; padding: 0 36px; background: linear-gradient(180deg, #050507 0%, rgba(5,5,7,0.92) 75%, transparent 100%); line-height: 72px; }
-    .brand { float: left; font-size: 22px; font-weight: 900; letter-spacing: 1px; color: #ffffff; text-decoration: none; }
-    .menu-bar { float: left; margin-left: 30px; }
-    .menu-item { display: inline-block; font-size: 13px; font-weight: 800; color: #7d8590; padding: 0 10px; margin-right: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .menu-item.active { color: #ffffff; }
-    .color-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: middle; }
+    
+    /* PROPORTION & ALIGNMENT FIXES */
+    .nav-wrap { position: fixed; top: 0; left: 0; right: 0; height: 72px; z-index: 100; padding: 0 36px; background: linear-gradient(180deg, #050507 0%, rgba(5,5,7,0.92) 75%, transparent 100%); display: flex; align-items: center; justify-content: space-between; }
+    .brand { font-size: 22px; font-weight: 900; letter-spacing: 1px; color: #ffffff; text-decoration: none; }
+    .menu-bar { display: flex; align-items: center; gap: 10px; margin-left: 20px; }
+    .menu-item { display: inline-flex; align-items: center; font-size: 13px; font-weight: 800; color: #7d8590; padding: 6px 12px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .menu-item.active { color: #ffffff; background: #16181d; }
+    .color-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; }
     .dot-red { background-color: #E50914; } .dot-green { background-color: #2ecc71; } .dot-yellow { background-color: #f1c40f; } .dot-blue { background-color: #3498db; }
-    .nav-actions { float: right; line-height: 72px; }
-    .action-btn { display: inline-block; background-color: #16181d; color: #d0d7de; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 800; margin-left: 8px; vertical-align: middle; }
-    .room-badge { display: inline-block; background-color: #E50914; color: #ffffff; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 900; letter-spacing: 1.5px; margin-left: 8px; vertical-align: middle; box-shadow: 0 2px 10px rgba(229, 9, 20, 0.4); }
-    .search-input { display: inline-block; width: 160px; background-color: #121318; border: 1px solid #30363d; color: #ffffff; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; vertical-align: middle; margin-left: 8px; transition: width 0.2s ease, border-color 0.2s ease; }
-    .search-input:focus { width: 220px; border-color: #58a6ff; }
-    .hero-banner { position: relative; width: 100%; height: 330px; background-color: #0a0b0e; background-position: center 20%; background-size: cover; background-repeat: no-repeat; padding: 85px 36px 20px 36px; overflow: hidden; }
+    
+    .nav-actions { display: flex; align-items: center; gap: 10px; }
+    .action-btn { background-color: #16181d; color: #d0d7de; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 800; }
+    .room-badge { background-color: #E50914; color: #ffffff; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 900; letter-spacing: 1.5px; box-shadow: 0 2px 10px rgba(229, 9, 20, 0.4); white-space: nowrap; }
+    .search-input { width: 180px; background-color: #121318; border: 1px solid #30363d; color: #ffffff; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; transition: width 0.2s ease, border-color 0.2s ease; }
+    .search-input:focus { width: 240px; border-color: #58a6ff; }
+
+    .hero-banner { position: relative; width: 100%; height: 330px; background-color: #0a0b0e; background-position: center 20%; background-size: cover; background-repeat: no-repeat; padding: 95px 36px 20px 36px; overflow: hidden; }
     .hero-vignette { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(90deg, #050507 0%, rgba(5,5,7,0.88) 42%, rgba(5,5,7,0.2) 100%), linear-gradient(180deg, transparent 50%, #050507 100%); }
     .hero-content { position: relative; z-index: 5; max-width: 680px; padding-top: 15px; }
     .hero-tag { display: inline-block; background-color: #E50914; color: #ffffff; font-size: 10px; font-weight: 900; padding: 4px 8px; border-radius: 3px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
     .hero-title { font-size: 34px; font-weight: 900; color: #ffffff; margin: 0 0 8px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 10px #000000; }
     .hero-meta { font-size: 13px; font-weight: 800; color: #ffca28; margin-bottom: 10px; }
     .hero-desc { font-size: 13px; font-weight: 500; color: #b1bac4; line-height: 1.45; height: 56px; overflow: hidden; margin: 0; }
+    
     .catalog-wrap { padding: 10px 26px 50px 26px; }
     .section-bar { padding: 0 10px 14px 10px; overflow: hidden; }
     .section-title { float: left; font-size: 18px; font-weight: 800; margin: 0; color: #ffffff; }
@@ -45,9 +50,26 @@
     .card-sub { font-size: 11px; color: #7d8590; font-weight: 700; margin-top: 3px; }
     .star-rating { color: #ffca28; }
     .loading-pulse { width: 98%; margin: 0 auto; height: 90px; border-radius: 8px; background-color: #0d0f14; text-align: center; line-height: 90px; color: #7d8590; font-size: 14px; font-weight: 700; }
+
+    /* VISUAL LOADING SPINNER OVERLAY */
+    #loadingSpinner { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(5,5,7,0.85); z-index: 100000; text-align: center; padding-top: 22vh; color: #fff; font-weight: 800; }
+    .spinner { width: 64px; height: 64px; border: 6px solid rgba(255,255,255,0.2); border-top-color: #E50914; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    #spinnerLabel { font-size: 18px; letter-spacing: 0.5px; text-shadow: 0 2px 8px rgba(0,0,0,0.8); }
+
+    /* EPISODE SELECTOR MODAL */
+    #episodeModal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(5,5,7,0.95); z-index: 99999; padding: 40px; text-align: center; }
+    .ep-container { max-width: 500px; margin: 80px auto; background: #121318; border: 1px solid #30363d; border-radius: 12px; padding: 30px; text-align: left; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+    .ep-title { font-size: 20px; font-weight: 900; color: #fff; margin-bottom: 20px; }
+    .ep-select-group { margin-bottom: 16px; }
+    .ep-select-group label { display: block; font-size: 11px; font-weight: 800; color: #7d8590; margin-bottom: 6px; text-transform: uppercase; }
+    .ep-select-group select { width: 100%; background: #1a1c23; border: 1px solid #30363d; color: #fff; padding: 12px; border-radius: 6px; font-weight: 700; font-size: 14px; }
+    .ep-btn { background: #E50914; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-weight: 900; font-size: 14px; cursor: pointer; width: 100%; margin-top: 14px; }
+
     #playerModal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 99999; }
     #tvPlayer { width: 100%; height: 100%; }
     #statusToast { display: none; position: fixed; bottom: 26px; right: 26px; background: #E50914; color: #fff; padding: 12px 22px; border-radius: 6px; font-weight: 800; font-size: 13px; z-index: 99999; }
+    
     .assistant-bar { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); width: 80%; max-width: 600px; background: rgba(18, 19, 24, 0.96); border: 1px solid #30363d; border-radius: 20px; padding: 16px 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 20px rgba(88, 166, 255, 0.25); transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 100000; }
     .assistant-bar.active { bottom: 40px; }
     .assistant-icon { font-size: 24px; margin-right: 16px; animation: glowPulse 1.5s infinite; text-shadow: 0 0 10px rgba(88, 166, 255, 0.8); }
@@ -70,7 +92,7 @@
     <div class="nav-actions">
       <div class="room-badge" id="roomBadge">CODE: ----</div>
       <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search Movies..." oninput="handleSearchInput(this.value)">
-      <button id="mic-btn" onclick="triggerVoiceSearch()" style="background: none; border: none; font-size: 20px; cursor: pointer; margin-left: 10px; vertical-align: middle;" title="Voice Search">🎤</button>
+      <button id="mic-btn" onclick="triggerVoiceSearch()" style="background: none; border: none; font-size: 20px; cursor: pointer; margin-left: 6px; vertical-align: middle;" title="Voice Search">🎤</button>
       <button onclick="window.location.reload()" class="action-btn">↻ [9]</button>
     </div>
   </header>
@@ -93,6 +115,29 @@
     <div class="grid" id="homeGrid">
       <div class="loading-pulse">Loading Cinema Catalog...</div>
     </div>
+  </div>
+
+  <!-- SERIES EPISODE SELECTOR MODAL -->
+  <div id="episodeModal">
+    <div class="ep-container">
+      <div class="ep-title" id="epModalTitle">Select Season & Episode</div>
+      <div class="ep-select-group">
+        <label>Season</label>
+        <select id="seasonSelect" onchange="populateEpisodesForSeason()"></select>
+      </div>
+      <div class="ep-select-group">
+        <label>Episode</label>
+        <select id="episodeSelect"></select>
+      </div>
+      <button class="ep-btn" onclick="confirmEpisodePlay()">▶ Play Episode</button>
+      <button class="ep-btn" style="background: #30363d; margin-top: 8px;" onclick="closeEpisodeModal()">✕ Cancel</button>
+    </div>
+  </div>
+
+  <!-- VISUAL LOADING SPINNER -->
+  <div id="loadingSpinner">
+    <div class="spinner"></div>
+    <div id="spinnerLabel">Resolving stream...</div>
   </div>
 
   <div id="playerModal">
@@ -118,9 +163,10 @@
     var currentPage = 1;
     var totalPages = 1;
     var isLoadingMore = false;
-
-    // CONVERSATIONAL MEMORY BUFFER (Stores last 6 messages)
     var chatHistory = [];
+    
+    // Series modal cached data
+    var activeSeriesData = null;
 
     // PERSISTENT ROOM CODE
     var roomCode = localStorage.getItem('pocketFlixRoomCode');
@@ -142,33 +188,19 @@
       var gainNode = audioCtx.createGain();
       osc.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-
-      if (type === 'start') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-        osc.start(audioCtx.currentTime);
-        osc.stop(audioCtx.currentTime + 0.2);
-      } else {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-        osc.start(audioCtx.currentTime);
-        osc.stop(audioCtx.currentTime + 0.3);
-      }
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(type === 'start' ? 440 : 600, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(type === 'start' ? 880 : 1200, audioCtx.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.2);
     }
 
-    // SPEECH SYNTHESIS (Make it Talk Aloud!)
     function speakText(text) {
       if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel(); // Stop any ongoing speech
+        window.speechSynthesis.cancel();
         var utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
         window.speechSynthesis.speak(utterance);
       }
     }
@@ -178,39 +210,70 @@
       clearTimeout(assistantHideTimeout);
       document.getElementById('assistantText').innerText = text;
       document.getElementById('assistantBar').classList.add('active');
-      if (speak) {
-        speakText(text);
-      }
+      if (speak) speakText(text);
     }
     function hideAssistant() {
       document.getElementById('assistantBar').classList.remove('active');
     }
 
+    // GEOLOCATION PERMISSION & WEATHER FETCHING
+    function requestLocationAndFetchWeather() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function(position) {
+            fetchWeatherCoords(position.coords.latitude, position.coords.longitude);
+          },
+          function(error) {
+            // Fallback to Nashik coordinates if permission denied
+            fetchWeatherCoords(19.9975, 73.7898);
+          },
+          { timeout: 10000 }
+        );
+      } else {
+        fetchWeatherCoords(19.9975, 73.7898);
+      }
+    }
+
+    function fetchWeatherCoords(lat, lon) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,weather_code', true);
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          var data = JSON.parse(xhr.responseText);
+          var temp = data.current.temperature_2m;
+          var msg = "It is currently " + temp + " degrees Celsius.";
+          showAssistant(msg, true);
+          chatHistory.push({ role: "assistant", content: msg });
+          assistantHideTimeout = setTimeout(hideAssistant, 6000);
+        }
+      };
+      xhr.send();
+    }
+
     // WEBSOCKET LOGIC
     try {
       var socket = io(BACKEND_URL);
-      socket.on('connect', function() {
-        socket.emit('join_room', roomCode);
-      });
+      socket.on('connect', function() { socket.emit('join_room', roomCode); });
       socket.on('execute_action', function(data) {
-        if (data.action === 'voice_query') {
-          processVoiceQuery(data.query);
-        }
+        if (data.action === 'voice_query') processVoiceQuery(data.query);
       });
-    } catch (e) {
-      console.log('Socket disconnected.');
-    }
+    } catch (e) {}
 
-    // VOICE QUERY & AI BRAIN WITH MEMORY
+    // AI BRAIN WITH SEPARATE MOVIE & SERIES DISCOVERY
     async function processVoiceQuery(query) {
       var lower = query.toLowerCase().trim();
       
       if (lower.startsWith("search ")) {
         var term = query.substring(7).trim();
         document.getElementById('searchInput').value = term; 
-        showAssistant('Searching Catalog for ' + term);
+        showAssistant('Searching Catalog for ' + term, false);
         handleSearchInput(term);
         assistantHideTimeout = setTimeout(hideAssistant, 3000);
+        return;
+      }
+      
+      if (lower.includes("weather")) {
+        requestLocationAndFetchWeather();
         return;
       }
       
@@ -221,63 +284,43 @@
       showAssistant("Thinking...", false);
       playBeep('start');
       
-      // Push user query to memory
       chatHistory.push({ role: "user", content: query });
-      if (chatHistory.length > 6) chatHistory.shift(); // Keep last 6 turns
+      if (chatHistory.length > 6) chatHistory.shift();
 
-      const systemPrompt = `You are the smart AI assistant of PocketFlix. Your user is Om, a student from Nashik preparing for JEE. You can answer ANY question, chat naturally, explain things, or find movies. You output strictly in JSON format.
-      - If the user wants to play, watch, or stream a movie/show, output: {"intent": "play", "title": "core title"}
-      - If the user asks a question, chats, or wants recommendations based on conversation history, output: {"intent": "chat", "answer": "your natural, conversational answer"}`;
+      const systemPrompt = `You are the smart AI assistant of PocketFlix. Your user is Om, a student from Nashik. You output strictly in JSON format.
+      - If user wants to watch a MOVIE, output: {"intent": "play_movie", "title": "core movie name"}
+      - If user wants to watch a TV SERIES or SHOW, output: {"intent": "play_series", "title": "core series name"}
+      - If user asks a question, chats, or wants recommendations, output: {"intent": "chat", "answer": "natural conversational answer"}`;
 
       try {
         const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + GROQ_API_KEY
-          },
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + GROQ_API_KEY },
           body: JSON.stringify({
             model: "openai/gpt-oss-20b", 
-            messages: [
-              { role: "system", content: systemPrompt },
-              ...chatHistory
-            ],
+            messages: [{ role: "system", content: systemPrompt }, ...chatHistory],
             response_format: { type: "json_object" },
             temperature: 0.3
           })
         });
         
         const data = await response.json();
-        if (data.error) {
-            showAssistant("AI Error: " + data.error.message);
-            assistantHideTimeout = setTimeout(hideAssistant, 6000);
-            return;
-        }
-
         if (data.choices && data.choices.length > 0) {
-          const aiResponse = data.choices[0].message.content;
-          try {
-              const parsed = JSON.parse(aiResponse);
-              
-              if (parsed.intent === 'play' && parsed.title) {
-                  chatHistory.push({ role: "assistant", content: `Playing ${parsed.title}` });
-                  showAssistant("Finding " + parsed.title);
-                  fetchTmdbIdAndPlay(parsed.title);
-              } else if (parsed.intent === 'chat' && parsed.answer) {
-                  chatHistory.push({ role: "assistant", content: parsed.answer });
-                  showAssistant(parsed.answer, true); // Speaks aloud!
-                  assistantHideTimeout = setTimeout(hideAssistant, 8000);
-              } else {
-                  showAssistant("I didn't quite catch that.");
-                  assistantHideTimeout = setTimeout(hideAssistant, 4000);
-              }
-          } catch (err) {
-              showAssistant("Response Error: Invalid JSON");
-              assistantHideTimeout = setTimeout(hideAssistant, 4000);
+          const parsed = JSON.parse(data.choices[0].message.content);
+          
+          if (parsed.intent === 'play_movie' && parsed.title) {
+            chatHistory.push({ role: "assistant", content: `Playing movie ${parsed.title}` });
+            showAssistant("Finding movie " + parsed.title, false);
+            lookupMediaAndExecute(parsed.title, 'movie');
+          } else if (parsed.intent === 'play_series' && parsed.title) {
+            chatHistory.push({ role: "assistant", content: `Opening series ${parsed.title}` });
+            showAssistant("Opening series " + parsed.title, false);
+            lookupMediaAndExecute(parsed.title, 'tv');
+          } else if (parsed.intent === 'chat' && parsed.answer) {
+            chatHistory.push({ role: "assistant", content: parsed.answer });
+            showAssistant(parsed.answer, true);
+            assistantHideTimeout = setTimeout(hideAssistant, 8000);
           }
-        } else {
-          showAssistant("API returned an empty response.");
-          assistantHideTimeout = setTimeout(hideAssistant, 4000);
         }
       } catch(e) {
         showAssistant("AI Connection Error.");
@@ -285,51 +328,166 @@
       }
     }
 
-    // TMDB SEARCH WITH FALLBACK
-    function fetchTmdbIdAndPlay(title) {
+    // TMDB LOOKUP SEPARATED BY TYPE (MOVIE VS TV)
+    function lookupMediaAndExecute(title, type) {
+      var url = 'https://api.themoviedb.org/3/search/' + type + '?api_key=' + TMDB_API_KEY + '&query=' + encodeURIComponent(title);
       var xhr = new XMLHttpRequest();
-      xhr.open('GET', 'https://api.themoviedb.org/3/search/multi?api_key=' + TMDB_API_KEY + '&query=' + encodeURIComponent(title), true);
+      xhr.open('GET', url, true);
       xhr.onload = function() {
         if (xhr.status === 200) {
           var resp = JSON.parse(xhr.responseText);
-          var results = (resp.results || []).filter(item => item.media_type !== 'person' && item.poster_path);
-          
+          var results = resp.results || [];
           if (results.length > 0) {
             var item = results[0];
             hideAssistant();
-            playMovie(item.id, item.title || item.name); 
-          } else {
-            var fallbackKeyword = title.split(' ')[0];
-            if (fallbackKeyword && fallbackKeyword.toLowerCase() !== title.toLowerCase()) {
-                fetchTmdbIdAndPlayFallback(fallbackKeyword, title);
+            if (type === 'tv') {
+              fetchSeriesDetailsAndOpenModal(item.id, item.name);
             } else {
-                showAssistant("Couldn't find " + title + " in TMDB.");
-                assistantHideTimeout = setTimeout(hideAssistant, 4000);
+              playMovie(item.id, item.title);
             }
+          } else {
+            showAssistant("Couldn't find " + title + ".");
+            assistantHideTimeout = setTimeout(hideAssistant, 4000);
           }
         }
       };
       xhr.send();
     }
 
-    function fetchTmdbIdAndPlayFallback(keyword, originalTitle) {
+    // FETCH TMDB SEASON & EPISODE DATA FOR SERIES
+    function fetchSeriesDetailsAndOpenModal(tvId, seriesTitle) {
+      document.getElementById('spinnerLabel').innerText = 'Loading series details...';
+      document.getElementById('loadingSpinner').style.display = 'block';
+
       var xhr = new XMLHttpRequest();
-      xhr.open('GET', 'https://api.themoviedb.org/3/search/multi?api_key=' + TMDB_API_KEY + '&query=' + encodeURIComponent(keyword), true);
+      xhr.open('GET', 'https://api.themoviedb.org/3/tv/' + tvId + '?api_key=' + TMDB_API_KEY, true);
       xhr.onload = function() {
+        document.getElementById('loadingSpinner').style.display = 'none';
         if (xhr.status === 200) {
-          var resp = JSON.parse(xhr.responseText);
-          var results = (resp.results || []).filter(item => item.media_type !== 'person' && item.poster_path);
-          if (results.length > 0) {
-            var item = results[0];
-            hideAssistant();
-            playMovie(item.id, item.title || item.name);
-          } else {
-            showAssistant("Couldn't find " + originalTitle + ".");
-            assistantHideTimeout = setTimeout(hideAssistant, 4000);
-          }
+          activeSeriesData = JSON.parse(xhr.responseText);
+          openEpisodeModal(seriesTitle, activeSeriesData);
+        } else {
+          showToast('❌ Could not load series seasons.');
         }
       };
       xhr.send();
+    }
+
+    function openEpisodeModal(seriesTitle, seriesObj) {
+      document.getElementById('epModalTitle').innerText = seriesTitle + ' - Select Season & Episode';
+      var seasonSelect = document.getElementById('seasonSelect');
+      seasonSelect.innerHTML = '';
+
+      var seasons = seriesObj.seasons || [];
+      for (var i = 0; i < seasons.length; i++) {
+        var s = seasons[i];
+        if (s.season_number > 0) { // Skip specials (season 0)
+          var opt = document.createElement('option');
+          opt.value = s.season_number;
+          opt.text = s.name + ' (' + s.episode_count + ' Episodes)';
+          seasonSelect.appendChild(opt);
+        }
+      }
+      populateEpisodesForSeason();
+      document.getElementById('episodeModal').style.display = 'block';
+    }
+
+    function populateEpisodesForSeason() {
+      var seasonNum = document.getElementById('seasonSelect').value;
+      var episodeSelect = document.getElementById('episodeSelect');
+      episodeSelect.innerHTML = '';
+
+      if (!activeSeriesData) return;
+      var targetSeason = activeSeriesData.seasons.find(s => s.season_number == seasonNum);
+      var epCount = targetSeason ? targetSeason.episode_count : 10;
+
+      for (var e = 1; e <= epCount; e++) {
+        var opt = document.createElement('option');
+        opt.value = e;
+        opt.text = 'Episode ' + e;
+        episodeSelect.appendChild(opt);
+      }
+    }
+
+    function closeEpisodeModal() {
+      document.getElementById('episodeModal').style.display = 'none';
+    }
+
+    function confirmEpisodePlay() {
+      var season = document.getElementById('seasonSelect').value;
+      var episode = document.getElementById('episodeSelect').value;
+      closeEpisodeModal();
+      playSeriesEpisode(activeSeriesData.id, activeSeriesData.name, season, episode);
+    }
+
+    function playSeriesEpisode(tvId, seriesName, season, episode) {
+      var titleStr = seriesName + ' S' + season + 'E' + episode;
+      document.getElementById('spinnerLabel').innerText = 'Sniffing stream for "' + titleStr + '"...';
+      document.getElementById('loadingSpinner').style.display = 'block';
+
+      var xhr = new XMLHttpRequest();
+      // Follows moviesnexus.fun TV Series Embed standard: /tv/:tmdbId/:season/:episode
+      xhr.open('GET', BACKEND_URL + '/resolve?tmdb=tv/' + tvId + '/' + season + '/' + episode, true);
+      xhr.onload = function() {
+        document.getElementById('loadingSpinner').style.display = 'none';
+        if (xhr.status === 200) {
+          try {
+            var data = JSON.parse(xhr.responseText);
+            if (data.status === 'ok' && data.streamUrl) {
+              showToast('▶ Playing "' + titleStr + '"');
+              startVideo(data.streamUrl.startsWith('http') ? data.streamUrl : (BACKEND_URL + data.streamUrl));
+            } else { showToast('❌ Stream link not found.'); }
+          } catch(e) { showToast('❌ Response error.'); }
+        } else { showToast('❌ Server error.'); }
+      };
+      xhr.send();
+    }
+
+    function playMovie(tmdbId, title) {
+      document.getElementById('spinnerLabel').innerText = 'Sniffing stream for "' + title + '"...';
+      document.getElementById('loadingSpinner').style.display = 'block';
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', BACKEND_URL + '/resolve?tmdb=' + tmdbId, true);
+      xhr.onload = function() {
+        document.getElementById('loadingSpinner').style.display = 'none';
+        if (xhr.status === 200) {
+          try {
+            var data = JSON.parse(xhr.responseText);
+            if (data.status === 'ok' && data.streamUrl) {
+              showToast('▶ Playing "' + title + '"');
+              startVideo(data.streamUrl.startsWith('http') ? data.streamUrl : (BACKEND_URL + data.streamUrl));
+            } else { showToast('❌ Stream link not found.'); }
+          } catch(e) { showToast('❌ Response error.'); }
+        } else { showToast('❌ Server error.'); }
+      };
+      xhr.send();
+    }
+
+    function selectCurrentCard() {
+      var item = currentItems[currentIndex];
+      if (!item) return;
+      var isSeries = (item.media_type === 'tv' || item.first_air_date);
+      if (isSeries) {
+        fetchSeriesDetailsAndOpenModal(item.id, item.name);
+      } else {
+        playMovie(item.id, item.title);
+      }
+    }
+
+    function startVideo(url) {
+      var modal = document.getElementById("playerModal");
+      var video = document.getElementById("tvPlayer");
+      if (modal) modal.style.display = "block";
+      if (window.Hls && Hls.isSupported() && url.indexOf(".m3u8") !== -1) {
+        if (hlsInstance) hlsInstance.destroy();
+        hlsInstance = new Hls();
+        hlsInstance.loadSource(url);
+        hlsInstance.attachMedia(video);
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() { if (video) video.play(); });
+      } else {
+        if (video) { video.src = url; video.play(); }
+      }
     }
 
     // TV MIC DETECTOR
@@ -346,7 +504,7 @@
             recognition.interimResults = false;
             recognition.onstart = () => { showAssistant("Listening...", false); playBeep('start'); };
             recognition.onresult = (event) => { processVoiceQuery(event.results[0][0].transcript); };
-            recognition.onerror = (event) => { showAssistant("Waiting for Phone Audio...", false); };
+            recognition.onerror = () => { showAssistant("Waiting for Phone Audio...", false); };
             recognition.start();
         } catch(err) {
             showAssistant("Waiting for Phone Audio...", false);
@@ -453,7 +611,7 @@
       var title = item.title || item.name || 'Untitled';
       var dateStr = (item.release_date || item.first_air_date || 'N/A').split('-')[0];
       var rating = item.vote_average ? item.vote_average.toFixed(1) : 'NR';
-      var isSeries = (item.first_air_date && !item.release_date);
+      var isSeries = (item.first_air_date && !item.release_date) || item.media_type === 'tv';
 
       document.getElementById('heroTag').innerText = isSeries ? 'TV SERIES' : 'FEATURE FILM';
       document.getElementById('heroTitle').innerText = title;
@@ -488,50 +646,21 @@
       if (t) { t.innerText = msg; t.style.display = "block"; setTimeout(function() { t.style.display = "none"; }, 4000); }
     }
 
-    function selectCurrentCard() {
-      var item = currentItems[currentIndex];
-      if (!item) return;
-      playMovie(item.id, item.title || item.name || 'Movie');
-    }
-
-    function playMovie(tmdbId, title) {
-      showToast('⚡ Sniffing stream for "' + title + '"...');
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET', BACKEND_URL + '/resolve?tmdb=' + tmdbId, true);
-      xhr.onload = function() {
-        if (xhr.status === 200) {
-          try {
-            var data = JSON.parse(xhr.responseText);
-            if (data.status === 'ok' && data.streamUrl) {
-              showToast('▶ Playing "' + title + '"');
-              startVideo(data.streamUrl.startsWith('http') ? data.streamUrl : (BACKEND_URL + data.streamUrl));
-            } else { showToast('❌ Could not resolve stream link.'); }
-          } catch(e) { showToast('❌ Error parsing response.'); }
-        } else { showToast('❌ Server error.'); }
-      };
-      xhr.send();
-    }
-
-    function startVideo(url) {
-      var modal = document.getElementById("playerModal");
-      var video = document.getElementById("tvPlayer");
-      if (modal) modal.style.display = "block";
-      if (window.Hls && Hls.isSupported() && url.indexOf(".m3u8") !== -1) {
-        if (hlsInstance) hlsInstance.destroy();
-        hlsInstance = new Hls();
-        hlsInstance.loadSource(url);
-        hlsInstance.attachMedia(video);
-        hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() { if (video) video.play(); });
-      } else {
-        if (video) { video.src = url; video.play(); }
-      }
-    }
-
+    // REMOTE CONTROLLER EVENT HANDLER
     window.addEventListener('keydown', function(e) {
       initAudio();
       var modal = document.getElementById("playerModal");
+      var epModal = document.getElementById("episodeModal");
       var code = e.keyCode || e.which;
       var key = e.key || '';
+
+      if (epModal && epModal.style.display === "block") {
+        if (code === 27 || code === 10009 || code === 8 || key === 'Escape') {
+          e.preventDefault();
+          closeEpisodeModal();
+        }
+        return;
+      }
 
       if (modal && modal.style.display === "block") {
         if (code === 27 || code === 10009 || code === 8 || key === 'Escape') {
@@ -540,9 +669,11 @@
           if (video) { video.pause(); video.src = ""; }
           if (hlsInstance) hlsInstance.destroy();
           modal.style.display = "none";
+          document.getElementById('loadingSpinner').style.display = 'none';
         }
         return;
       }
+
       if (document.activeElement === document.getElementById('searchInput')) return;
       if (code === 48 || code === 96 || key === '0') { e.preventDefault(); triggerVoiceSearch(); return; }
 
