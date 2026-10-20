@@ -55,13 +55,13 @@ app.get('/proxy-stream', async (req, res) => {
   }
 });
 
-// Stream Sniffer (Xvfb Disabled & Headless Patched)
+// Stream Sniffer (Explicitly maps Render's Chrome path)
 async function sniffStream(tmdbId) {
   let browserInstance;
   try {
-    const { browser, page } = await connect({
-      headless: 'new', // Forces invisible mode to prevent screen crashes
-      disableXvfb: true, // Bypasses Render's lack of Linux screen managers
+    const browserConfig = {
+      headless: 'new',
+      disableXvfb: true,
       turnstile: true,
       args: [
         '--no-sandbox',
@@ -70,7 +70,14 @@ async function sniffStream(tmdbId) {
         '--disable-gpu',
         '--single-process'
       ]
-    });
+    };
+
+    // If running on Render cloud, point directly to the installed Chrome binary
+    if (process.env.CHROME_PATH) {
+      browserConfig.executablePath = process.env.CHROME_PATH;
+    }
+
+    const { browser, page } = await connect(browserConfig);
     browserInstance = browser;
 
     await page.setViewport({ width: 800, height: 600 });
@@ -129,7 +136,7 @@ async function sniffStream(tmdbId) {
     });
   } catch (err) {
     if (browserInstance) await browserInstance.close().catch(() => {});
-    throw err; // Send error to the router instead of crashing the app
+    throw err;
   }
 }
 
