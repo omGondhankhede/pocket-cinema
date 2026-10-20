@@ -37,7 +37,7 @@ app.get('/proxy-stream', async (req, res) => {
     const upstreamRes = await fetch(targetUrl, {
       headers: {
         'Referer': 'https://www.moviesnexus.fun/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
       }
     });
 
@@ -70,7 +70,7 @@ app.get('/proxy-stream', async (req, res) => {
 
 async function resolveViaPuppeteerIntercept(tmdbParam) {
   let browser;
-  console.log(`\n[SmartResolver] Launching aggressive headless browser for: ${tmdbParam}`);
+  console.log(`\n[SmartResolver] Launching CSP-Bypass browser for: ${tmdbParam}`);
 
   try {
     browser = await puppeteer.launch({
@@ -90,6 +90,11 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
     });
 
     const page = await browser.newPage();
+    
+    // 🔥 THE MAGIC FIX FOR THE CSP ERROR 🔥
+    // Completely disables Content Security Policy on the page, allowing the internal API to execute.
+    await page.setBypassCSP(true); 
+    
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 720 });
 
@@ -97,7 +102,6 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
       let resolved = false;
       let clickInterval;
 
-      // Centralized finish function to prevent memory leaks
       const finish = async (result) => {
         if (!resolved) {
           resolved = true;
@@ -113,7 +117,6 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
         finish(null);
       }, 50000);
 
-      // Listen for the stream URL in the network traffic
       page.on('response', async (response) => {
         const url = response.url();
         try {
@@ -139,17 +142,14 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
       try {
         const targetUrl = `https://www.moviesnexus.fun/${tmdbParam.startsWith('tv/') ? tmdbParam : 'movie/' + tmdbParam}?autoPlay=1`;
         console.log(`[SmartResolver] Navigating to: ${targetUrl}`);
+        
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
         console.log(`[SmartResolver] Page loaded. Starting aggressive click loop...`);
 
-        // The Aggressive Click Loop
         clickInterval = setInterval(async () => {
           if (resolved) return;
           try {
-            // Click the exact center of the screen to trigger native players
             await page.mouse.click(640, 360);
-            
-            // Dive into every single iframe and force play events
             const frames = page.frames();
             for (const frame of frames) {
               await frame.evaluate(() => {
@@ -161,7 +161,7 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
               }).catch(()=>{});
             }
           } catch (e) {}
-        }, 2500); // Fires every 2.5 seconds until the stream is caught
+        }, 2000); 
 
       } catch (err) {
         console.log(`[SmartResolver] Navigation notice: ${err.message}`);
