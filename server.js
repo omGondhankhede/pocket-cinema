@@ -3,10 +3,6 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-puppeteer.use(StealthPlugin());
-
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
@@ -31,108 +27,94 @@ io.on('connection', (socket) => {
   });
 });
 
+// ROBUST STREAM PROXY (Passes correct Referer headers so video chunks load)
 app.get('/proxy-stream', async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).send('Missing stream URL');
 
   try {
-    const response = await fetch(targetUrl, {
-      headers: { 'Referer': 'https://www.moviesnexus.fun/' }
-    });
-    let playlistText = await response.text();
-    const lines = playlistText.split('\n');
-    const sanitizedLines = lines.filter(line => !line.includes('TYPE="AUDIO"') && !line.includes("TYPE='AUDIO'"));
-    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.send(sanitizedLines.join('\n'));
-  } catch (err) {
-    res.status(500).send('Failed to proxy stream');
-  }
-});
-
-// SMART PUPPETEER API-INTERCEPT RESOLVER WITH CLICK SIMULATION
-async function resolveViaPuppeteerIntercept(tmdbParam) {
-  let browser;
-  console.log(`\n[SmartResolver] Launching browser for target: ${tmdbParam}`);
-
-  try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-web-security',
-        '--allow-running-insecure-content',
-        '--disable-features=IsolateOrigins,site-per-process'
-      ]
-    });
-
-    const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    await page.setViewport({ width: 1280, height: 720 });
-
-    return new Promise(async (resolve) => {
-      let resolved = false;
-
-      const timer = setTimeout(async () => {
-        if (!resolved) {
-          resolved = true;
-          console.log(`[SmartResolver] ⚠️ Timeout reached (50s)`);
-          if (browser) await browser.close().catch(() => {});
-          resolve(null);
-        }
-      }, 50000);
-
-      page.on('response', async (response) => {
-        const url = response.url();
-        try {
-          if (url.includes('/api/extract') && response.status() === 200) {
-            const data = await response.json();
-            if (!resolved && data) {
-              const streamUrl = data.url || (data.sources && data.sources[0] && (data.sources[0].file || data.sources[0].url));
-              if (streamUrl) {
-                resolved = true;
-                console.log(`[SmartResolver] ✅ CAUGHT STREAM URL FROM API EXTRACT!`);
-                clearTimeout(timer);
-                setTimeout(async () => { if (browser) await browser.close().catch(() => {}); }, 1000);
-                resolve(streamUrl);
-              }
-            }
-          } else if ((url.includes('.m3u8') || url.includes('.mp4')) && !url.includes('google')) {
-            if (!resolved) {
-              resolved = true;
-              console.log(`[SmartResolver] ✅ CAUGHT DIRECT MEDIA URL!`);
-              clearTimeout(timer);
-              setTimeout(async () => { if (browser) await browser.close().catch(() => {}); }, 1000);
-              resolve(url);
-            }
-          }
-        } catch (e) {}
-      });
-
-      try {
-        const targetUrl = `https://www.moviesnexus.fun/${tmdbParam.startsWith('tv/') ? tmdbParam : 'movie/' + tmdbParam}`;
-        console.log(`[SmartResolver] Navigating to: ${targetUrl}`);
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
-        
-        // Wait 4 seconds for scripts to mount, then simulate a click to trigger the extraction endpoint
-        await new Promise(r => setTimeout(r, 4000));
-        await page.evaluate(() => {
-          document.body.click();
-          const playBtn = document.querySelector('button, .play, .player, video');
-          if (playBtn) playBtn.click();
-        }).catch(() => {});
-
-      } catch (err) {
-        console.log(`[SmartResolver] Navigation notice: ${err.message}`);
+    const upstreamRes = await fetch(targetUrl, {
+      headers: {
+        'Referer': 'https://www.moviesnexus.fun/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
     });
 
+    if (!upstreamRes.ok) {
+      return res.status(upstreamRes.status).send('Failed to fetch stream chunk');
+    }
+
+    const contentType = upstreamRes.headers.get('content-type') || 'application/vnd.apple.mpegurl';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // If it's the master m3u8 playlist, rewrite chunk URLs to route through our proxy
+    let bodyText = await upstreamRes.text();
+    if (targetUrl.includes('.m3u8')) {
+      const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
+      const lines = bodyText.split('\n');
+      const rewrittenLines = lines.map(line => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          const absoluteChunkUrl = trimmed.startsWith('http') ? trimmed : baseUrl + trimmed;
+          return `/proxy-stream?url=${encodeURIComponent(absoluteChunkUrl)}`;
+        }
+        return line;
+      });
+      res.send(rewrittenLines.join('\n'));
+    } else {
+      res.send(bodyText);
+    }
   } catch (err) {
-    console.error(`[SmartResolver] Browser Error: ${err.message}`);
-    if (browser) await browser.close().catch(() => {});
+    res.status(500).send('Proxy error: ' + err.message);
+  }
+});
+
+// LIGHTNING-FAST DIRECT API EXTRACTOR (0 seconds lag, no headless browser needed!)
+async function resolveStreamDirectly(tmdbParam) {
+  console.log(`\n[FastApiResolver] Resolving target: ${tmdbParam}`);
+  
+  let mediaType = 'movie';
+  let tmdbId = tmdbParam;
+  let season = 1;
+  let episode = 1;
+
+  if (tmdbParam.startsWith('tv/')) {
+    mediaType = 'tv';
+    const parts = tmdbParam.split('/');
+    tmdbId = parts[1];
+    season = parts[2] || 1;
+    episode = parts[3] || 1;
+  }
+
+  try {
+    const pageUrl = `https://www.moviesnexus.fun/${mediaType === 'tv' ? `tv/${tmdbId}/${season}/${episode}` : `movie/${tmdbId}`}`;
+    
+    // Call the internal moviesnexus extraction API directly with proper headers
+    const apiExtractUrl = `https://www.moviesnexus.fun/api/extract?mediaType=${mediaType}&tmdbId=${tmdbId}${mediaType === 'tv' ? `&season=${season}&episode=${episode}` : ''}`;
+    
+    const apiRes = await fetch(apiExtractUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': pageUrl,
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+
+    if (apiRes.ok) {
+      const data = await apiRes.json();
+      if (data) {
+        const streamUrl = data.url || (data.sources && data.sources[0] && (data.sources[0].file || data.sources[0].url));
+        if (streamUrl) {
+          console.log(`[FastApiResolver] ✅ Successfully extracted stream URL instantly!`);
+          return streamUrl;
+        }
+      }
+    }
+    console.log(`[FastApiResolver] ⚠️ API returned invalid payload.`);
+    return null;
+  } catch (err) {
+    console.error(`[FastApiResolver] Error: ${err.message}`);
     return null;
   }
 }
@@ -143,7 +125,7 @@ app.get('/resolve', async (req, res) => {
   console.log(`[*] Request to resolve target: ${tmdbParam}`);
   
   try {
-    const streamUrl = await resolveViaPuppeteerIntercept(tmdbParam);
+    const streamUrl = await resolveStreamDirectly(tmdbParam);
     if (streamUrl) {
       res.json({ status: 'ok', streamUrl: `/proxy-stream?url=${encodeURIComponent(streamUrl)}` });
     } else {
