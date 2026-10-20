@@ -1,19 +1,30 @@
-<!-- Movie Embed -->
-<iframe 
-  src="https://www.moviesnexus.fun/movie/969681" 
-  width="100%" 
-  height="100%" 
-  frameborder="0" 
-  allow="autoplay; fullscreen; encrypted-media; picture-in-picture" 
-  allowfullscreen>
-</iframe>
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
 
-<!-- TV Series Embed -->
-<iframe 
-  src="https://www.moviesnexus.fun/tv/{tmdbId}/{season}/{episode}" 
-  width="100%" 
-  height="100%" 
-  frameborder="0" 
-  allow="autoplay; fullscreen; encrypted-media; picture-in-picture" 
-  allowfullscreen>
-</iframe>
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: '*' } });
+
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+app.get('/', (req, res) => {
+  res.send('PocketFlix Cinema Backend is Live & Running!');
+});
+
+io.on('connection', (socket) => {
+  socket.on('join_room', (roomCode) => {
+    socket.join(roomCode);
+    if (roomCode && roomCode !== 'undefined') {
+      console.log(`[+] Device joined Room: ${roomCode}`);
+    }
+  });
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Cloud Server running on port ${PORT}`);
+});
