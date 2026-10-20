@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const { connect } = require('puppeteer-real-browser');
+const puppeteer = require('puppeteer');
 
 const app = express();
 const server = http.createServer(app);
@@ -46,22 +46,20 @@ app.get('/proxy-stream', async (req, res) => {
 });
 
 async function sniffStream(tmdbId) {
-  let browserInstance;
+  let browser;
   try {
-    const { browser, page } = await connect({
-      headless: true,
-      turnstile: true,
+    browser = await puppeteer.launch({
       executablePath: process.env.CHROME_PATH || '/opt/render/project/puppeteer/chrome/linux-155.0.8059.79/chrome-linux64/chrome',
+      headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--single-process'
+        '--disable-gpu'
       ]
     });
-    browserInstance = browser;
 
+    const page = await browser.newPage();
     await page.setViewport({ width: 800, height: 600 });
     await page.setRequestInterception(true);
     
@@ -78,7 +76,7 @@ async function sniffStream(tmdbId) {
       let resolved = false;
       const timer = setTimeout(async () => {
         if (!resolved) {
-          if (browserInstance) await browserInstance.close().catch(() => {});
+          if (browser) await browser.close().catch(() => {});
           resolve(null);
         }
       }, 45000);
@@ -89,7 +87,7 @@ async function sniffStream(tmdbId) {
           if (!resolved) {
             resolved = true;
             clearTimeout(timer);
-            setTimeout(async () => { if (browserInstance) await browserInstance.close().catch(() => {}); }, 1500);
+            setTimeout(async () => { if (browser) await browser.close().catch(() => {}); }, 1500);
             resolve(url);
           }
         }
@@ -114,7 +112,7 @@ async function sniffStream(tmdbId) {
       }
     });
   } catch (err) {
-    if (browserInstance) await browserInstance.close().catch(() => {});
+    if (browser) await browser.close().catch(() => {});
     throw err;
   }
 }
