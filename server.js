@@ -70,14 +70,14 @@ app.get('/proxy-stream', async (req, res) => {
   }
 });
 
-// HEADLESS AUTOPLAY INTERCEPTOR (No Xvfb required)
+// AUTOPLAY PARAMETER INTERCEPTOR
 async function resolveViaPuppeteerIntercept(tmdbParam) {
   let browser;
   console.log(`\n[SmartResolver] Launching stealth headless browser for: ${tmdbParam}`);
 
   try {
     browser = await puppeteer.launch({
-      headless: true,
+      headless: "new", // Modern headless mode that evades basic bot detection
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -87,8 +87,7 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
         '--allow-running-insecure-content',
         '--disable-features=IsolateOrigins,site-per-process',
         '--window-size=1280,720',
-        '--autoplay-policy=no-user-gesture-required', // Forces video to play automatically
-        '--mute-audio' // Browsers allow autoplay without clicks IF the audio is muted!
+        '--mute-audio'
       ]
     });
 
@@ -137,11 +136,12 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
       });
 
       try {
-        const targetUrl = `https://www.moviesnexus.fun/${tmdbParam.startsWith('tv/') ? tmdbParam : 'movie/' + tmdbParam}`;
+        // MAGIC FIX: Utilizing the native ?autoPlay=1 parameter from their docs
+        const targetUrl = `https://www.moviesnexus.fun/${tmdbParam.startsWith('tv/') ? tmdbParam : 'movie/' + tmdbParam}?autoPlay=1`;
         console.log(`[SmartResolver] Navigating to: ${targetUrl}`);
         
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
-        console.log(`[SmartResolver] Page loaded. Muted autoplay should trigger stream...`);
+        console.log(`[SmartResolver] Page loaded. Native ?autoPlay=1 flag should trigger extraction...`);
 
       } catch (err) {
         console.log(`[SmartResolver] Navigation notice: ${err.message}`);
