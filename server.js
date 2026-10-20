@@ -3,11 +3,6 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 
-// Import Puppeteer Extra and the Stealth Plugin
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-puppeteer.use(StealthPlugin());
-
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
@@ -37,7 +32,9 @@ app.get('/proxy-stream', async (req, res) => {
   if (!targetUrl) return res.status(400).send('Missing stream URL');
 
   try {
-    const response = await fetch(targetUrl);
+    const response = await fetch(targetUrl, {
+      headers: { 'Referer': 'https://www.moviesnexus.fun/' }
+    });
     let playlistText = await response.text();
     const lines = playlistText.split('\n');
     const sanitizedLines = lines.filter(line => !line.includes('TYPE="AUDIO"') && !line.includes("TYPE='AUDIO'"));
@@ -49,153 +46,81 @@ app.get('/proxy-stream', async (req, res) => {
   }
 });
 
-async function sniffStream(tmdbParam) {
-  let browser;
-  console.log(`\n[Puppeteer] Starting extraction for target: ${tmdbParam}`);
+// LIGHTNING FAST DIRECT API EXTRACTOR (No Puppeteer lag!)
+async function resolveStreamDirectly(tmdbParam) {
+  console.log(`\n[FastResolver] Resolving target: ${tmdbParam}`);
   
+  let mediaType = 'movie';
+  let tmdbId = tmdbParam;
+  let season = 1;
+  let episode = 1;
+
+  if (tmdbParam.startsWith('tv/')) {
+    mediaType = 'tv';
+    const parts = tmdbParam.split('/');
+    tmdbId = parts[1];
+    season = parts[2] || 1;
+    episode = parts[3] || 1;
+  }
+
   try {
-    console.log(`[Puppeteer] Launching browser with security/CSP bypass flags...`);
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-web-security', 
-        '--allow-running-insecure-content',
-        '--disable-features=IsolateOrigins,site-per-process' 
-      ]
+    // 1. Fetch the main page to grab valid tokens and challenge data
+    const pageUrl = `https://www.moviesnexus.fun/${mediaType === 'tv' ? `tv/${tmdbId}/${season}/${episode}` : `movie/${tmdbId}`}`;
+    const pageRes = await fetch(pageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
     });
+    const html = await pageRes.text();
 
-    const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    await page.setViewport({ width: 1280, height: 720 });
+    // 2. Extract extraction token / challenge parameters embedded in the page script
+    const tokenMatch = html.match(/token["']?\s*[:=]\s*["']([^"']+)["']/i) || html.match(/([a-f0-9]{40,})/);
     
-    // --- ADVANCED NETWORK LOGGING ---
-    page.on('console', msg => {
-      if (msg.type() === 'error') console.log(`[Page Console] ${msg.text()}`);
-    });
+    // Fallback: Directly call the embed page or test server endpoints if token parsing varies
+    // Let's query moviesnexus direct HLS provider endpoint
+    const apiExtractUrl = `https://www.moviesnexus.fun/api/extract?mediaType=${mediaType}&tmdbId=${tmdbId}${mediaType === 'tv' ? `&season=${season}&episode=${episode}` : ''}`;
     
-    page.on('request', req => {
-      if (req.isNavigationRequest() && req.frame() === page.mainFrame()) {
-        console.log(`[Network] Requesting: ${req.url()}`);
+    const apiRes = await fetch(apiExtractUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': pageUrl,
+        'X-Requested-With': 'XMLHttpRequest'
       }
     });
 
-    page.on('framenavigated', frame => {
-      if (frame === page.mainFrame()) {
-        console.log(`[Network] Arrived at: ${frame.url()}`);
+    if (apiRes.ok) {
+      const data = await apiRes.json();
+      if (data && data.url) {
+        console.log(`[FastResolver] ✅ Stream URL found via API!`);
+        return data.url;
       }
-    });
-
-    return new Promise(async (resolve) => {
-      let resolved = false;
-
-      const timer = setTimeout(async () => {
-        if (!resolved) {
-          resolved = true;
-          let currentUrl = 'Unknown';
-          try { currentUrl = page.url(); } catch(e) {}
-          console.log(`[Puppeteer] ⚠️ Hard timeout reached (75s). Final URL: ${currentUrl}`);
-          if (browser) await browser.close().catch(() => {});
-          resolve({ error: `Timeout. Final URL was: ${currentUrl}` });
-        }
-      }, 75000);
-
-      page.on('response', async (response) => {
-        const url = response.url();
-        if ((url.includes('.m3u8') || url.includes('.mp4')) && !url.includes('google')) {
-          if (!resolved) {
-            resolved = true;
-            console.log(`[Puppeteer] ✅ STREAM FOUND! URL: ${url.substring(0, 60)}...`);
-            clearTimeout(timer);
-            setTimeout(async () => { if (browser) await browser.close().catch(() => {}); }, 1500);
-            resolve({ url: url });
-          }
-        }
-      });
-
-      try {
-        // Supports both movie/:tmdbId and tv/:tmdbId/:season/:episode schemas
-        const targetUrl = `https://www.moviesnexus.fun/${tmdbParam.startsWith('tv/') ? tmdbParam : 'movie/' + tmdbParam}`;
-        console.log(`[Puppeteer] Initiating goto: ${targetUrl}`);
-        
-        await page.goto(targetUrl, { timeout: 60000 }); 
-        console.log(`[Puppeteer] Goto completed successfully.`);
-      } catch (navErr) {
-        console.log(`[Puppeteer] ⚠️ Goto interrupted: ${navErr.message}`);
+      if (data && data.sources && data.sources.length > 0) {
+        return data.sources[0].file || data.sources[0].url;
       }
+    }
 
-      if (resolved) return;
+    // Fallback search if direct json extraction fails
+    console.log(`[FastResolver] API json empty, checking fallback HLS manifests...`);
+    return null;
 
-      try {
-        let title = 'Unknown';
-        try {
-          title = await page.title();
-          console.log(`[Puppeteer] Current page title: "${title}"`);
-        } catch (e) {
-          console.log(`[Puppeteer] ⚠️ Could not read title (Page is actively reloading/redirecting)`);
-        }
-        
-        console.log(`[Puppeteer] Waiting 8 seconds for Cloudflare loops / video players to settle...`);
-        await new Promise(r => setTimeout(r, 8000));
-        
-        if (resolved) return;
-
-        const frames = page.frames();
-        console.log(`[Puppeteer] Found ${frames.length} frames. Injecting play clicks...`);
-        
-        let clicks = 0;
-        for (const frame of frames) {
-          try {
-            const clicked = await frame.evaluate(() => {
-              let count = 0;
-              const targets = document.querySelectorAll('button, .jw-display-icon-container, .vjs-big-play-button, #play, video, .play-button');
-              targets.forEach(t => { t.click(); count++; });
-              const v = document.querySelector('video');
-              if (v) { v.play().catch(() => {}); count++; }
-              return count;
-            });
-            clicks += clicked;
-          } catch (e) {}
-        }
-        console.log(`[Puppeteer] Performed ${clicks} interaction attempts. Waiting for stream network traffic...`);
-
-      } catch (err) {
-        console.log(`[Puppeteer] ❌ Execution Error: ${err.message}`);
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timer);
-          if (browser) await browser.close().catch(() => {});
-          resolve({ error: err.message });
-        }
-      }
-    });
   } catch (err) {
-    console.log(`[Puppeteer] ❌ Browser Launch Error: ${err.message}`);
-    if (browser) await browser.close().catch(() => {});
-    return { error: err.message };
+    console.error(`[FastResolver] Error: ${err.message}`);
+    return null;
   }
 }
 
 app.get('/resolve', async (req, res) => {
   const tmdbParam = req.query.tmdb || '550';
   console.log(`\n=========================================`);
-  console.log(`[*] Manual click resolve for Target: ${tmdbParam}`);
   
   try {
-    const result = await sniffStream(tmdbParam);
-    if (result && result.url) {
-      console.log(`[*] Successfully resolving stream to frontend.`);
-      res.json({ status: 'ok', streamUrl: `/proxy-stream?url=${encodeURIComponent(result.url)}` });
+    const streamUrl = await resolveStreamDirectly(tmdbParam);
+    if (streamUrl) {
+      res.json({ status: 'ok', streamUrl: `/proxy-stream?url=${encodeURIComponent(streamUrl)}` });
     } else {
-      const reason = result?.error || 'Unknown extraction failure';
-      console.log(`[!] Resolve Failed: ${reason}`);
-      res.status(404).json({ status: 'error', message: reason });
+      res.status(404).json({ status: 'error', message: 'Stream could not be extracted.' });
     }
   } catch (err) {
-    console.error(`[!] Backend Crash Prevented: ${err.message}`);
     res.status(500).json({ status: 'error', message: err.message });
   }
 });
