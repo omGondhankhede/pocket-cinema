@@ -57,63 +57,25 @@ app.get('/proxy-stream', async (req, res) => {
   }
 });
 
-// Automatically locate Chrome binary on Render or local machine
-function getAutoChromePath() {
-  if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
-
-  const searchDirs = [
-    '/opt/render/project/puppeteer',
-    '/opt/render/.cache/puppeteer',
-    path.join(process.cwd(), '.cache/puppeteer')
-  ];
-
-  for (const dir of searchDirs) {
-    try {
-      if (fs.existsSync(dir)) {
-        const scanDir = (currentPath) => {
-          const entries = fs.readdirSync(currentPath, { withFileTypes: true });
-          for (const entry of entries) {
-            const fullPath = path.join(currentPath, entry.name);
-            if (entry.isDirectory()) {
-              const found = scanDir(fullPath);
-              if (found) return found;
-            } else if (entry.isFile() && entry.name === 'chrome') {
-              return fullPath;
-            }
-          }
-          return null;
-        };
-        const found = scanDir(dir);
-        if (found) {
-          console.log(`[*] Auto-detected Chrome binary at: ${found}`);
-          return found;
-        }
-      }
-    } catch (e) {}
-  }
-  return null;
-}
-
-// Stream Sniffer with Dynamic Chrome Finder
+// Stream Sniffer with Optimized Headless Config & Path Fallbacks
 async function sniffStream(tmdbId) {
   let browserInstance;
   try {
     const browserConfig = {
-      headless: 'new',
-      disableXvfb: true,
+      headless: true,
       turnstile: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
+        '--no-zygote',
         '--single-process'
       ]
     };
 
-    const detectedPath = getAutoChromePath();
-    if (detectedPath) {
-      browserConfig.executablePath = detectedPath;
+    if (process.env.CHROME_PATH) {
+      browserConfig.executablePath = process.env.CHROME_PATH;
     }
 
     const { browser, page } = await connect(browserConfig);
