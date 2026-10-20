@@ -3,6 +3,10 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
@@ -46,65 +50,81 @@ app.get('/proxy-stream', async (req, res) => {
   }
 });
 
-// LIGHTNING FAST DIRECT API EXTRACTOR (No Puppeteer lag!)
-async function resolveStreamDirectly(tmdbParam) {
-  console.log(`\n[FastResolver] Resolving target: ${tmdbParam}`);
-  
-  let mediaType = 'movie';
-  let tmdbId = tmdbParam;
-  let season = 1;
-  let episode = 1;
-
-  if (tmdbParam.startsWith('tv/')) {
-    mediaType = 'tv';
-    const parts = tmdbParam.split('/');
-    tmdbId = parts[1];
-    season = parts[2] || 1;
-    episode = parts[3] || 1;
-  }
+// SMART PUPPETEER API-INTERCEPT RESOLVER
+async function resolveViaPuppeteerIntercept(tmdbParam) {
+  let browser;
+  console.log(`\n[SmartResolver] Launching browser for target: ${tmdbParam}`);
 
   try {
-    // 1. Fetch the main page to grab valid tokens and challenge data
-    const pageUrl = `https://www.moviesnexus.fun/${mediaType === 'tv' ? `tv/${tmdbId}/${season}/${episode}` : `movie/${tmdbId}`}`;
-    const pageRes = await fetch(pageUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
-    });
-    const html = await pageRes.text();
-
-    // 2. Extract extraction token / challenge parameters embedded in the page script
-    const tokenMatch = html.match(/token["']?\s*[:=]\s*["']([^"']+)["']/i) || html.match(/([a-f0-9]{40,})/);
-    
-    // Fallback: Directly call the embed page or test server endpoints if token parsing varies
-    // Let's query moviesnexus direct HLS provider endpoint
-    const apiExtractUrl = `https://www.moviesnexus.fun/api/extract?mediaType=${mediaType}&tmdbId=${tmdbId}${mediaType === 'tv' ? `&season=${season}&episode=${episode}` : ''}`;
-    
-    const apiRes = await fetch(apiExtractUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': pageUrl,
-        'X-Requested-With': 'XMLHttpRequest'
-      }
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--allow-running-insecure-content',
+        '--disable-features=IsolateOrigins,site-per-process'
+      ]
     });
 
-    if (apiRes.ok) {
-      const data = await apiRes.json();
-      if (data && data.url) {
-        console.log(`[FastResolver] ✅ Stream URL found via API!`);
-        return data.url;
-      }
-      if (data && data.sources && data.sources.length > 0) {
-        return data.sources[0].file || data.sources[0].url;
-      }
-    }
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1280, height: 720 });
 
-    // Fallback search if direct json extraction fails
-    console.log(`[FastResolver] API json empty, checking fallback HLS manifests...`);
-    return null;
+    return new Promise(async (resolve) => {
+      let resolved = false;
+
+      const timer = setTimeout(async () => {
+        if (!resolved) {
+          resolved = true;
+          console.log(`[SmartResolver] ⚠️ Timeout reached (30s)`);
+          if (browser) await browser.close().catch(() => {});
+          resolve(null);
+        }
+      }, 30000);
+
+      // Intercept network responses to catch the extraction API payload instantly
+      page.on('response', async (response) => {
+        const url = response.url();
+        try {
+          if (url.includes('/api/extract') && response.status() === 200) {
+            const data = await response.json();
+            if (!resolved && data) {
+              const streamUrl = data.url || (data.sources && data.sources[0] && (data.sources[0].file || data.sources[0].url));
+              if (streamUrl) {
+                resolved = true;
+                console.log(`[SmartResolver] ✅ CAUGHT STREAM URL FROM API EXTRACT!`);
+                clearTimeout(timer);
+                setTimeout(async () => { if (browser) await browser.close().catch(() => {}); }, 1000);
+                resolve(streamUrl);
+              }
+            }
+          } else if ((url.includes('.m3u8') || url.includes('.mp4')) && !url.includes('google')) {
+            if (!resolved) {
+              resolved = true;
+              console.log(`[SmartResolver] ✅ CAUGHT DIRECT MEDIA URL!`);
+              clearTimeout(timer);
+              setTimeout(async () => { if (browser) await browser.close().catch(() => {}); }, 1000);
+              resolve(url);
+            }
+          }
+        } catch (e) {}
+      });
+
+      try {
+        const targetUrl = `https://www.moviesnexus.fun/${tmdbParam.startsWith('tv/') ? tmdbParam : 'movie/' + tmdbParam}`;
+        console.log(`[SmartResolver] Navigating to: ${targetUrl}`);
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 25000 });
+      } catch (err) {
+        console.log(`[SmartResolver] Navigation notice: ${err.message}`);
+      }
+    });
 
   } catch (err) {
-    console.error(`[FastResolver] Error: ${err.message}`);
+    console.error(`[SmartResolver] Browser Error: ${err.message}`);
+    if (browser) await browser.close().catch(() => {});
     return null;
   }
 }
@@ -112,9 +132,10 @@ async function resolveStreamDirectly(tmdbParam) {
 app.get('/resolve', async (req, res) => {
   const tmdbParam = req.query.tmdb || '550';
   console.log(`\n=========================================`);
+  console.log(`[*] Request to resolve target: ${tmdbParam}`);
   
   try {
-    const streamUrl = await resolveStreamDirectly(tmdbParam);
+    const streamUrl = await resolveViaPuppeteerIntercept(tmdbParam);
     if (streamUrl) {
       res.json({ status: 'ok', streamUrl: `/proxy-stream?url=${encodeURIComponent(streamUrl)}` });
     } else {
