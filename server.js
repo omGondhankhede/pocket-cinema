@@ -2,6 +2,8 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const { connect } = require('puppeteer-real-browser');
 
 const app = express();
@@ -55,7 +57,44 @@ app.get('/proxy-stream', async (req, res) => {
   }
 });
 
-// Stream Sniffer (Explicitly maps Render's Chrome path)
+// Automatically locate Chrome binary on Render or local machine
+function getAutoChromePath() {
+  if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
+
+  const searchDirs = [
+    '/opt/render/project/puppeteer',
+    '/opt/render/.cache/puppeteer',
+    path.join(process.cwd(), '.cache/puppeteer')
+  ];
+
+  for (const dir of searchDirs) {
+    try {
+      if (fs.existsSync(dir)) {
+        const scanDir = (currentPath) => {
+          const entries = fs.readdirSync(currentPath, { withFileTypes: true });
+          for (const entry of entries) {
+            const fullPath = path.join(currentPath, entry.name);
+            if (entry.isDirectory()) {
+              const found = scanDir(fullPath);
+              if (found) return found;
+            } else if (entry.isFile() && entry.name === 'chrome') {
+              return fullPath;
+            }
+          }
+          return null;
+        };
+        const found = scanDir(dir);
+        if (found) {
+          console.log(`[*] Auto-detected Chrome binary at: ${found}`);
+          return found;
+        }
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+// Stream Sniffer with Dynamic Chrome Finder
 async function sniffStream(tmdbId) {
   let browserInstance;
   try {
@@ -72,9 +111,9 @@ async function sniffStream(tmdbId) {
       ]
     };
 
-    // If running on Render cloud, point directly to the installed Chrome binary
-    if (process.env.CHROME_PATH) {
-      browserConfig.executablePath = process.env.CHROME_PATH;
+    const detectedPath = getAutoChromePath();
+    if (detectedPath) {
+      browserConfig.executablePath = detectedPath;
     }
 
     const { browser, page } = await connect(browserConfig);
