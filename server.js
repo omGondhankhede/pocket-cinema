@@ -20,18 +20,16 @@ app.get('/', (req, res) => {
   res.send('PocketFlix Cinema Backend is Live & Running!');
 });
 
+// Muted the noisy socket logs so health-checkers don't spam your console
 io.on('connection', (socket) => {
-  console.log(`[+] TV Connected: ${socket.id}`);
   socket.on('join_room', (roomCode) => {
     socket.join(roomCode);
-    console.log(`[+] TV ${socket.id} joined Room: ${roomCode}`);
-  });
-  socket.on('disconnect', () => {
-    console.log(`[-] TV Disconnected: ${socket.id}`);
+    if (roomCode && roomCode !== 'undefined') {
+      console.log(`[+] Device joined Room: ${roomCode}`);
+    }
   });
 });
 
-// ROBUST STREAM PROXY (Passes correct Referer headers so video chunks load)
 app.get('/proxy-stream', async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).send('Missing stream URL');
@@ -73,7 +71,7 @@ app.get('/proxy-stream', async (req, res) => {
   }
 });
 
-// HYBRID PUPPETEER NETWORK INTERCEPTOR (Fast & Reliable)
+// AGGRESSIVE PUPPETEER NETWORK INTERCEPTOR
 async function resolveViaPuppeteerIntercept(tmdbParam) {
   let browser;
   console.log(`\n[SmartResolver] Launching browser for target: ${tmdbParam}`);
@@ -88,7 +86,8 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
         '--disable-gpu',
         '--disable-web-security',
         '--allow-running-insecure-content',
-        '--disable-features=IsolateOrigins,site-per-process'
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--window-size=1280,720'
       ]
     });
 
@@ -102,31 +101,34 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
       const timer = setTimeout(async () => {
         if (!resolved) {
           resolved = true;
-          console.log(`[SmartResolver] ⚠️ Timeout reached (35s)`);
+          console.log(`[SmartResolver] ⚠️ Timeout reached (45s)`);
           if (browser) await browser.close().catch(() => {});
           resolve(null);
         }
-      }, 35000);
+      }, 45000);
 
       page.on('response', async (response) => {
         const url = response.url();
         try {
+          // 1. Catch API extraction payload
           if (url.includes('/api/extract') && response.status() === 200) {
             const data = await response.json();
             if (!resolved && data) {
               const streamUrl = data.url || (data.sources && data.sources[0] && (data.sources[0].file || data.sources[0].url));
               if (streamUrl) {
                 resolved = true;
-                console.log(`[SmartResolver] ✅ CAUGHT STREAM URL FROM API EXTRACT!`);
+                console.log(`[SmartResolver] ✅ CAUGHT STREAM URL FROM API!`);
                 clearTimeout(timer);
                 setTimeout(async () => { if (browser) await browser.close().catch(() => {}); }, 1000);
                 resolve(streamUrl);
               }
             }
-          } else if ((url.includes('.m3u8') || url.includes('.mp4')) && !url.includes('google')) {
+          } 
+          // 2. Catch raw master.m3u8 or index.m3u8 files directly if the API is bypassed
+          else if ((url.includes('.m3u8') || url.includes('.mp4')) && !url.includes('google') && !url.includes('empty')) {
             if (!resolved) {
               resolved = true;
-              console.log(`[SmartResolver] ✅ CAUGHT DIRECT MEDIA URL!`);
+              console.log(`[SmartResolver] ✅ CAUGHT DIRECT M3U8 URL!`);
               clearTimeout(timer);
               setTimeout(async () => { if (browser) await browser.close().catch(() => {}); }, 1000);
               resolve(url);
@@ -138,11 +140,28 @@ async function resolveViaPuppeteerIntercept(tmdbParam) {
       try {
         const targetUrl = `https://www.moviesnexus.fun/${tmdbParam.startsWith('tv/') ? tmdbParam : 'movie/' + tmdbParam}`;
         console.log(`[SmartResolver] Navigating to: ${targetUrl}`);
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
         
-        // Brief pause to allow the auto-extraction fetch request to fire
-        await new Promise(r => setTimeout(r, 4000));
-        await page.evaluate(() => { document.body.click(); }).catch(() => {});
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
+        
+        console.log(`[SmartResolver] Page loaded. Injecting auto-play scripts...`);
+        await new Promise(r => setTimeout(r, 2000));
+        
+        // Aggressive interaction: click center of screen, trigger play events
+        await page.evaluate(() => {
+          document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)?.click();
+          document.querySelectorAll('video').forEach(v => v.play().catch(()=>{}));
+          document.querySelectorAll('.play-btn, button, .vjs-big-play-button, .jw-icon-display').forEach(b => b.click());
+        }).catch(() => {});
+
+        // Drill into iframes and click to trigger the stream
+        for (const frame of page.frames()) {
+          try {
+            await frame.evaluate(() => {
+              document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)?.click();
+              document.querySelectorAll('video').forEach(v => v.play().catch(()=>{}));
+            });
+          } catch (e) {}
+        }
 
       } catch (err) {
         console.log(`[SmartResolver] Navigation notice: ${err.message}`);
