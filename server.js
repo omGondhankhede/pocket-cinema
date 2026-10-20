@@ -49,7 +49,6 @@ async function sniffStream(tmdbId) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      executablePath: process.env.CHROME_PATH || '/opt/render/project/puppeteer/chrome/linux-155.0.8059.79/chrome-linux64/chrome',
       headless: true,
       args: [
         '--no-sandbox',
